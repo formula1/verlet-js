@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Verlet Cloth Simulation</title>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="../css/style.css" type="text/css" media="screen, projection" />
+  <link href='http://fonts.googleapis.com/css?family=Libre+Baskerville:400,700,400italic' rel='stylesheet' type='text/css'>
+  <script type="text/javascript" src="../js/verlet-1.0.0.js"></script>
+</head>
+<body>
+<script type="text/javascript" src="../site/js/common.js"></script>
+<div id="header">
+  <h1><a href="../">verlet-js</a> / <em>Area</em></h1>
+<p>
+  <h4>Author</h4>
+  <a href="http://subprotocol.com/">Sam Tobia</a>
+
+  <h4>Summary</h4>
+
+  Test of an area constraint
+  <h4>Source Code</h4>
+  <a href="https://github.com/formula1/verlet-js/blob/master/examples/cloth.html">View on GitHub</a>
+</p>
+</div>
+<canvas id="scratch" style="width: 800px; height: 500px; background-color:#000"></canvas>
+<script type="text/javascript">
+
+window.onload = function() {
+  var canvas = document.getElementById("scratch");
+
+  // canvas dimensions
+  var width = parseInt(canvas.style.width);
+  var height = parseInt(canvas.style.height);
+
+  // retina
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = width*dpr;
+  canvas.height = height*dpr;
+  canvas.getContext("2d").scale(dpr, dpr);
+
+  // simulation
+  var draw = new VerletDraw(width, height, canvas);
+  var sim = draw.physics
+  sim.friction = 1;
+  var origin = new Vec2(width/4,height/4);
+  var points = 4;
+  var distance = 100;
+  var offset = origin.add(new Vec2(distance,0));
+  var vs =[];
+  for(var i=0;i<points;i++){
+    vs.push(offset.rotate(origin,2*Math.PI*i/points));
+  }
+  // entities
+  var linearblob = sim.lineSegments(vs, 0.02,true);
+
+  linearblob.constraints.push(new AreaConstraint(linearblob.particles,0.4));
+
+  var angularblob = new sim.Composite();
+  origin = new Vec2(width*3/4,height*3/4);
+  for(i=0;i<points+2;i++){
+    if(i < points){
+      angularblob.particles.push(new Particle(offset.rotate(origin,2*Math.PI*i/points)));
+    }
+    if(i > 1){
+      angularblob.constraints.push(new AngleConstraint(
+        angularblob.particles[(i-2)%points],
+        angularblob.particles[(i-1)%points],
+        angularblob.particles[i%points],
+        0.02
+      ));
+    }
+  }
+  angularblob.constraints.push(new AreaConstraint(angularblob.particles,1));
+
+//  sim.composites.push(angularblob);
+
+  // animation loop
+  var legIndex = 0;
+  var loop = function() {
+    sim.frame(16);
+    draw.draw();
+    requestAnimFrame(loop);
+  };
+
+  loop();
+};
+
+
+</script>
+<div id="footer">
+  Copyright 2013 Sub Protocol and other contributors.
+  <br/><a href="http://subprotocol.com/">http://subprotocol.com/</a>
+</div>
+</body>
