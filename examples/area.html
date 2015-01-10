@@ -19,7 +19,7 @@
 
   Test of an area constraint
   <h4>Source Code</h4>
-  <a href="https://github.com/formula1/verlet-js/blob/master/examples/cloth.html">View on GitHub</a>
+  <a href="https://github.com/formula1/verlet-js/blob/master/examples/area.html">View on GitHub</a>
 </p>
 </div>
 <canvas id="scratch" style="width: 800px; height: 500px; background-color:#000"></canvas>
@@ -43,7 +43,7 @@ window.onload = function() {
   var sim = draw.physics
   sim.friction = 1;
   var origin = new Vec2(width/4,height/4);
-  var points = 4;
+  var points = 7;
   var distance = 100;
   var offset = origin.add(new Vec2(distance,0));
   var vs =[];
@@ -53,7 +53,7 @@ window.onload = function() {
   // entities
   var linearblob = sim.lineSegments(vs, 0.02,true);
 
-  linearblob.constraints.push(new AreaConstraint(linearblob.particles,0.4));
+  linearblob.constraints.push(new AreaConstraint(linearblob.particles,0.2));
 
   var angularblob = new sim.Composite();
   origin = new Vec2(width*3/4,height*3/4);
