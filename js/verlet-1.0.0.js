@@ -50,6 +50,12 @@ module.exports = Vec2
 function Vec2(x, y) {
 	this.x = x || 0;
 	this.y = y || 0;
+	var _this = this;
+	Object.defineProperty(this,"asArray",{
+		get:function(){
+			return [_this.x,_this.y];
+		}
+	});
 }
 
 Vec2.prototype.add = function(v) {
@@ -70,6 +76,31 @@ Vec2.prototype.div = function(v) {
 
 Vec2.prototype.scale = function(coef) {
 	return new Vec2(this.x*coef, this.y*coef);
+}
+
+Vec2.prototype.normal = function() {
+	var m = Math.sqrt(this.x*this.x + this.y*this.y);
+	return new Vec2(this.x/m, this.y/m);
+}
+
+Vec2.prototype.rotate = function(origin, theta) {
+	var x = this.x - origin.x;
+	var y = this.y - origin.y;
+	return new Vec2(x*Math.cos(theta) - y*Math.sin(theta) + origin.x, x*Math.sin(theta) + y*Math.cos(theta) + origin.y);
+}
+
+Vec2.prototype.min = function(v){
+	return new Vec2(
+		Math.min(this.x, v.x),
+		Math.min(this.y, v.y)
+	);
+}
+
+Vec2.prototype.max = function(v){
+	return new Vec2(
+		Math.max(this.x, v.x),
+		Math.max(this.y, v.y)
+	);
 }
 
 Vec2.prototype.mutableSet = function(v) {
@@ -134,11 +165,6 @@ Vec2.prototype.dist2 = function(v) {
 	return x*x + y*y;
 }
 
-Vec2.prototype.normal = function() {
-	var m = Math.sqrt(this.x*this.x + this.y*this.y);
-	return new Vec2(this.x/m, this.y/m);
-}
-
 Vec2.prototype.dot = function(v) {
 	return this.x*v.x + this.y*v.y;
 }
@@ -151,12 +177,6 @@ Vec2.prototype.angle2 = function(vLeft, vRight) {
 	return vLeft.sub(this).angle(vRight.sub(this));
 }
 
-Vec2.prototype.rotate = function(origin, theta) {
-	var x = this.x - origin.x;
-	var y = this.y - origin.y;
-	return new Vec2(x*Math.cos(theta) - y*Math.sin(theta) + origin.x, x*Math.sin(theta) + y*Math.cos(theta) + origin.y);
-}
-
 Vec2.prototype.toString = function() {
 	return "(" + this.x + ", " + this.y + ")";
 }
@@ -166,22 +186,59 @@ Vec2.prototype.cross = function(v){
 	return this.x * v.y - this.y * v.x;
 }
 
-Vec2.prototype.min = function(v){
-	return new Vec2(
-		Math.min(this.x, v.x),
-		Math.min(this.y, v.y)
-	);
-}
-
-Vec2.prototype.max = function(v){
-	return new Vec2(
-		Math.max(this.x, v.x),
-		Math.max(this.y, v.y)
-	);
-}
-
 //=============================================================
 
+Vec2.overloaded = function(){
+	if(arguments.length > 2){
+		throw new Error("improper number of arguments");
+	}
+	if(arguments.length == 0){
+		return new Vec2();
+	}
+	if(arguments.length == 2){
+		if(typeof arguments[0] != "number" || typeof arguments[1] != "number"){
+			throw new Error("2 numbers are required when providing 2 arguments");
+		}
+	}
+	if(arguments.length == 1){
+		if(arguments[0] instanceof Vec2){
+			return arguments[0];
+		}
+		if(arguments[0].pos && arguments[0].pos instanceof Vec2){
+			return arguments[0].pos;
+		}
+		if(Array.isArray(arguments[0])){
+			if(x.length != 2){
+				throw new Error("Vec2 needs an array of 2 when providing an array");
+			}
+			return Vec2.overloaded(arguments[0][0],arguments[0][1]);
+		}
+		throw new Error("for one argument, a Vec2, Particle or an Array is required");
+	}
+}
+
+Vec2.overloadArguments = function(args,lengthTest,iterateTest){
+	var len;
+	if((len = lengthTest(args.length))){
+		args = Array.prototype.slice.call(args,0);
+	}else if(args.length == 1){
+		if(!Array.isArray(args[0])){
+			throw new Error("need either an Array or Arguments");
+		}
+		if(!(len = lengthTest(args[0].length))){
+			throw new Error("improper number of arguments in array");
+		}
+		args = args[0].slice(0);
+	}else{
+		console.log(args.length);
+		throw new Error("improper number of arguments");
+	}
+	for(var i=0;i<len;i++){
+		args[i] = Vec2.overloaded(args[i])
+		if(iterateTest) iterateTest(i,args);
+	}
+	return args;
+}
 
 
 function test_Vec2() {
@@ -742,23 +799,6 @@ var Vec2 = require("./Vec2")
 function Particle(pos) {
   this.pos = (new Vec2()).mutableSet(pos);
   this.lastPos = (new Vec2()).mutableSet(pos);
-  var _this = this;
-  Object.defineProperty(this,"x",{
-    get:function(){
-      return _this.pos.x;
-    },
-    set:function(ny){
-      _this.pos.x = nx;
-    }
-  })
-  Object.defineProperty(this,"y",{
-    get:function(){
-      return _this.pos.y;
-    },
-    set:function(ny){
-      _this.pos.y = ny;
-    }
-  })
 }
 
 Particle.prototype.draw = function(ctx) {
@@ -794,6 +834,7 @@ module.exports = PinConstraint;
 
 },{"../structures/Vec2":6}],12:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
+var Triangle = require("../structures/Triangle");
 var Polygon = require("../structures/Polygon");
 
 
@@ -822,8 +863,8 @@ AreaConstraint.prototype.relax = function(stepCoef) {
   var mid = new Vec2();
   var l = this.points.length;
   this.points.forThree(function(prev,curr,next){
-    area += curr.pos.cross(next.pos);
-    mid.mutableAdd(curr.pos.scale(1/l))
+    area += curr.cross(next);
+    mid.mutableAdd(curr.scale(1/l))
   })
   if(area <= 0){
     alert("negative area");
@@ -847,37 +888,62 @@ AreaConstraint.prototype.relax = function(stepCoef) {
 
 
   var _this = this;
-  this.points.forThree(function(prev,curr,next){
-    var dist = curr.pos.sub(mid);
-    dist = dist.scale(Math.sqrt(diff));
-    dist = mid.add(dist);
-    curr.pos = dist;
-    if(curr != _this.points[0]){
-      _this.storedarea += prev.pos.cross(curr.pos);
+  this.points.forThree(function(prev,curr,next,i){
+    var ok = true;
+    var tri = new Triangle(prev,curr,next);
+    if(tri.isConcave()){
+      if(tri.hasPoint(_this.storedmid)){
+        problem = true;
+      }
+      var intersections = _this.points.getIntersects(prev,curr,i);
+      if(intersections.length > 0){
+        //alert("you may get a negative area here");
+        var dist = curr
+        .sub(mid)
+        .scale(Math.sqrt(diff))
+        .add(mid);
+        curr.mutableSet(dist);
+        ok = false;
+      }
     }
-    _this.storedmid.mutableAdd(curr.pos.scale(1/l));
+    if(ok){
+      var dist = curr
+        .sub(mid)
+        .scale(Math.sqrt(diff))
+        .add(mid);
+      curr.mutableSet(dist);
+    }
+    if(curr != _this.points[0]){
+      _this.storedarea += prev.cross(curr);
+    }
+    _this.storedmid.mutableAdd(curr.scale(1/l));
   })
-  _this.storedarea += this.points[l-1].pos.cross(this.points[0].pos);
+  _this.storedarea += this.points[l-1].cross(this.points[0]);
 }
 AreaConstraint.prototype.draw = function(ctx) {
   var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
   var inv = Math.floor(Math.min(255,255*this.storedarea/this.area));
   ctx.beginPath();
-  ctx.moveTo(this.points["0"].pos.x, this.points["0"].pos.y);
+  ctx.moveTo(this.points["0"].x, this.points["0"].y);
   var _this = this;
   var problem = false;
   var intersects = [];
   this.points.forThree(function(prev,curr,next,i){
-    if(Polygon.triangleIsConcave(prev,curr,next)){
+    var tri = new Triangle(prev,curr,next);
+    if(tri.isConcave()){
       ctx.strokeStyle="#FF0000";
-      if(Polygon.triangleHasPoint(prev,curr,next,_this.storedmid)){
+      if(tri.hasPoint(_this.storedmid)){
         problem = true;
+      }
+      var intersections = _this.points.getIntersects(prev,curr,i);
+      if(intersections.length > 0){
+//        alert("you may get a negative area here");
+        intersects = intersects.concat(intersections);
       }
     }else{
       ctx.strokeStyle="#FFFFFF";
     }
-    intersects = intersects.concat(_this.points.getIntersects(prev,curr,i));
-    ctx.lineTo(curr.pos.x,curr.pos.y);
+    ctx.lineTo(curr.x,curr.y);
   })
 
   var g = (diff < inv)?diff:inv;
@@ -896,6 +962,16 @@ AreaConstraint.prototype.draw = function(ctx) {
     ctx.fillStyle = "#FF8300";
     ctx.fill();
   });
+
+  var tri = this.points.getDelaney();
+  for(i = tri.length; i; ) {
+    ctx.beginPath();
+    --i; ctx.moveTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
 
   ctx.beginPath();
   ctx.arc(
@@ -957,132 +1033,96 @@ There are a few issues here
 
 */
 
-},{"../structures/Polygon":13,"../structures/Vec2":6}],13:[function(require,module,exports){
-
+},{"../structures/Polygon":14,"../structures/Triangle":13,"../structures/Vec2":6}],13:[function(require,module,exports){
 var Vec2 = require("./Vec2");
-var Line = require("./Line");
+var Circle = require("./Circle");
 
-function Polygon(points){
-  if(arguments.length == 0){
-    points = [];
+
+function Triangle(){
+  var args = Vec2.overloadArguments(
+    arguments,
+    Triangle.lengthTest,
+    Triangle.iterateTest
+  )
+  this.A = args[0];
+  this.B = args[1];
+  this.C = args[2];
+}
+
+Triangle.prototype.getCircumCircle = function(){
+  Triangle.getCircumCircle(this.A,this.B,this.C);
+}
+
+Triangle.prototype.isConcave = function(){
+  Triangle.isConcave(this.A,this.B,this.C);
+}
+
+Triangle.prototype.hasPoint = function(point){
+  return Triangle.hasPoint(this.A,this.B,this.C,point);
+}
+
+Triangle.lengthTest = function(length){
+  return (length == 3)?3:false;
+}
+
+Triangle.iterateTest = function(i,args){
+  if(i == 0) return;
+  if(args[i-1].equals(args[i])){
+    throw new Error("Cannot build when argument["+(i-1)+"] == argument["+i+"]");
   }
-  if(!Array.isArray(points)){
-    if(arguments.length > 1){
-      points = Array.prototype.slice.call(arguments,0);
-    }else{
-      throw new Error("arguments must either be >=3 or an Array that is >= 3");
+}
+
+
+Triangle.getCircumCircle = function(a,b,c){
+  var x1 = a.x,
+  y1 = a.y,
+  x2 = b.x,
+  y2 = b.y,
+  x3 = c.x,
+  y3 = c.y,
+  fabsy1y2 = Math.abs(y1 - y2),
+  fabsy2y3 = Math.abs(y2 - y3),
+  xc, yc, m1, m2, mx1, mx2, my1, my2, dx, dy;
+  /* Check for coincident points */
+  if(fabsy1y2 < EPSILON && fabsy2y3 < EPSILON)
+    throw new Error("Eek! Coincident points!");
+    if(fabsy1y2 < EPSILON) {
+      m2 = -((x3 - x2) / (y3 - y2));
+      mx2 = (x2 + x3) / 2.0;
+      my2 = (y2 + y3) / 2.0;
+      xc = (x2 + x1) / 2.0;
+      yc = m2 * (xc - mx2) + my2;
     }
-  }
-  if(points.length < 3) throw new Error("point groups must be a minimum of 3");
-  if(points instanceof Polygon)
-    return points;
-  for(var i in Polygon.prototype){
-    Object.defineProperty(points,i,{
-      enumerable: false,
-      value:Polygon.prototype[i].bind(points)
-    });
-
-  }
-  return points;
+    else if(fabsy2y3 < EPSILON) {
+      m1 = -((x2 - x1) / (y2 - y1));
+      mx1 = (x1 + x2) / 2.0;
+      my1 = (y1 + y2) / 2.0;
+      xc = (x3 + x2) / 2.0;
+      yc = m1 * (xc - mx1) + my1;
+    }
+    else {
+      m1 = -((x2 - x1) / (y2 - y1));
+      m2 = -((x3 - x2) / (y3 - y2));
+      mx1 = (x1 + x2) / 2.0;
+      mx2 = (x2 + x3) / 2.0;
+      my1 = (y1 + y2) / 2.0;
+      my2 = (y2 + y3) / 2.0;
+      xc = (m1 * mx1 - m2 * mx2 + my2 - my1) / (m1 - m2);
+      yc = (fabsy1y2 > fabsy2y3) ?
+      m1 * (xc - mx1) + my1 :
+      m2 * (xc - mx2) + my2;
+    }
+    dx = x2 - xc;
+    dy = y2 - yc;
+    return new Circle(new Vec2(xc,yc),dx * dx + dy * dy);
 }
 
-Polygon.prototype.forThree = function(fn,skip){
-  var l = this.length;
-  for(var i=skip||0;i<l;i++){
-    var prev = (i+l-1)%l;//((i == 0)?l:i) -1
-    var curr = i;
-    var next = (i+1)%l; //i == l-1?0:i+1
-    fn(this[prev],this[curr],this[next], curr);
-  }
-}
-
-Polygon.prototype.getIntersects = function(tprev,tcurr,skip){
-  //creating smaller aabbs
-  //We're going to detect intersection by slope
-  //however, the point of intersection may be outside of the of the possible area
-  //as a result we're creating a smaller aabb thats the maxes and minimums of the current area
-
-  var tAABB = {
-    max: tprev.pos.max(tcurr.pos),
-    min: tprev.pos.min(tcurr.pos)
-  };
-  var tAB_line = new Line(tprev,tcurr);
-
-  var intersections = [];
-
-  this.forThree(function(oprev,ocurr,onext){
-    if(tcurr.pos.equals(ocurr.pos)) return;
-    if(tcurr.pos.equals(oprev.pos)) return;
-    if(oprev.pos.equals(tcurr.pos)) return;
-    var oAABB = {
-      max: oprev.pos.max(ocurr.pos),
-      min: oprev.pos.min(ocurr.pos)
-    };
-
-    if(tAABB.min.x >= oAABB.max.x) return;
-    if(tAABB.min.y >= oAABB.max.y) return;
-    if(oAABB.min.x >= tAABB.max.x) return;
-    if(oAABB.min.y >= tAABB.max.y) return;
-
-    //I would like to cache the oprev->ocurr line if possible
-    //I would also prefer searching only for lines with the appropiate AABBs
-    var intersect = tAB_line.getIntersection(oprev,ocurr);
-    if(!intersect) return;
-
-    var netAABB = {
-      max: oAABB.max.min(tAABB.max),
-      min: oAABB.min.max(tAABB.min)
-    };
-    //If intersect point isn't between the two points, this isn't for us.
-    if(intersect.x >= netAABB.max.x) return;
-    if(intersect.y >= netAABB.max.y) return;
-    if(intersect.x <= netAABB.min.x) return;
-    if(intersect.y <= netAABB.min.y) return;
-
-    intersections.push(intersect);
-
-  },skip);
-
-  return intersections;
-}
-
-Polygon.prototype.getMidPoint = function(){
-  var l = points.length;
-  var mid = new Vec2();
-  //http://www.wikihow.com/Calculate-the-Area-of-a-Polygon
-  this.forEach(function(point){
-    mid = mid.add(point.pos.scale(1/l));
-  })
-  return mid;
-}
-
-Polygon.prototype.getArea = function(){
-  var net = 0;
-  //http://www.wikihow.com/Calculate-the-Area-of-a-Polygon
-  this.forThree(function(a,b,c){
-    net += b.pos.cross(c.pos);
-  })
-  return net;
-}
-
-Polygon.prototype.getAABB = function(){
-  var max = new Vec2(-Number.Infinity,-Number.Infinity);
-  var min = new Vec2(Number.Infinity,Number.Infinity);
-  this.forEach(function(point){
-    if(point.x < min.x) min.x = point.x;
-    else if(point.x > max.x) max.x = point.x;
-    if(point.y < min.y) min.y = point.y;
-    else if(point.y > max.y) max.y = point.y
-  })
-  return {max:max,min:min};
-}
-
-Polygon.triangleHasPoint = function(a,b,c,point){
+Triangle.hasPoint = function(a,b,c,point){
   //http://www.blackpawn.com/texts/pointinpoly/
   // Compute vectors
-  var v0 = c.pos.sub(b.pos);
-  var v1 = a.pos.sub(b.pos);
-  var v2 = point.sub(b.pos);
+  var v0 = c.sub(b);
+  var v1 = a.sub(b);
+  var v2 = point.sub(b);
 
   // Compute dot products
   var dot00 = v0.dot(v0);
@@ -1100,84 +1140,195 @@ Polygon.triangleHasPoint = function(a,b,c,point){
   return (u >= 0) && (v >= 0) && (u + v < 1)
 }
 
-Polygon.triangleIsConcave = function(a,b,c){
+Triangle.isConcave = function(a,b,c){
   //rotate the points around B to make B and A parrallel to the X axis
   //If the line BC is negative, it is Concave
   //If the line BC is positive, it is Convex
 
-  var ABhyp = a.pos.dist(b.pos);
-  var ABopp = b.pos.y - a.pos.y
+  var ABhyp = a.dist(b);
+  var ABopp = b.y - a.y
 
   var ABrotate = Math.asin(ABopp/ABhyp);
-  var Anew = a.pos.rotate(b.pos,ABrotate);
-  var Cnew = c.pos.rotate(b.pos,ABrotate);
+  var Cnew = c.rotate(c,-ABrotate);
 
-  ACadj = c.pos.x - a.pos.x;
-  ACopp = c.pos.y - a.pos.y;
-  if(ACadj == 0){
+  BCadj = Cnew.x - b.x;
+  BCopp = Cnew.y - b.y;
+  if(BCadj == 0){
     //We are also considering if they are the exact same point to be concave
-    return (ACopp < 0)
+    return (BCopp < 0)
   }
   //We are also considering straight line to be convex
-  return (ACopp/ACadj > 0);
+  return (BCopp/BCadj > 0);
 }
 
+module.exports = Triangle;
 
-module.exports = Polygon;
+},{"./Circle":15,"./Vec2":6}],15:[function(require,module,exports){
+var Vec2 = require("./Vec2");
 
-},{"./Line":14,"./Vec2":6}],14:[function(require,module,exports){
-
-
-function Line(points){
-
-  if(arguments.length > 2) throw new Error("can only accept 2 or less arguments");
-  if(arguments.length == 2){
-    points = Array.prototype.slice.call(arguments,0);
-  }else if(arguments.length == 1){
-    if(!Array.isArray(points)){
-      throw new Error("If you are only providing a single Argument, it must be an array");
-    }
-  }else{
-    throw new Error("When constructing a line, must have 2 points");
+function Circle(midpoint, radius){
+  var args;
+  if(typeof radius == "number"){
+    this.radius = radius;
+    this.midpoint = Vec2.overloaded(midpoint);
+    return;
   }
-  this.slope = points[0].pos.sub(points[1].pos);
+  args = Vec2.overloadArguments(
+    arguments,
+    Circle.lengthTest
+  );
+  if(args.length == 2){
+    this.midpoint = args[0].add(args[1]).scale(1/2);
+    this.radius = args[0].dist(args[1])/2;
+  }else if(args.length == 3){
+    var pbAB = (new Line(args[0], args[1])).getPerpendicularBisect();
+    var pbCB = (new Line(args[2], args[1])).getPerpendicularBisect();
+    this.midpoint = pbAB.getIntersection(pbCB);
+    this.radius = args[0].dist(this.midpoint);
+  }else{
+    throw new Error("can only construct a Circle from 2 or 3 points or midpoint and radius");
+  }
+
+}
+
+Circle.prototype.containsPoint = function(point){
+  return this.midpoint.dist(point.pos) < radius;
+}
+
+Circle.prototype.hasPoint = function(){
+  return this.midpoint.dist(point.pos) == radius;
+}
+
+Circle.prototype.getLineIntersection = function(line){
+  //http://mathworld.wolfram.com/Circle-LineIntersection.html
+  var lx = -line.xint.x;
+  var ly = line.yint.y;
+  var lr = Math.sqrt(ly*ly + lx+lx);
+  cr = line.xint.cross(line.yint); //line.xint.x*line.yint.y + 0*0
+
+  var r = this.radius
+
+  var delta = r*r*dr*dr - cr*cr;
+  if(delta < 0) return false;
+  lr = lr*lr; //reduce calculations
+  if(delta == 0){
+    return [new Vec2(
+      cr*ly/lr,
+      -cr*lx/lr
+    )];
+  }
+  //reduce calculations
+  delta = Math.sqrt(delta);
+  var crly = cr*ly;
+  var crlx = -cr*lx;
+  var sigdel = Math.sig(ly)*lx * delta;
+  var absdel = Math.abs(ly) * delta;
+  return [
+    new Vec2(
+      (crly + sigdel) / lr
+      (crlx + absdel) / lr
+    ),
+    new Vec2(
+      (crly - sigdel) / lr
+      (crlx - absdel) / lr
+    )
+  ]
+}
+
+Circle.lengthTest = function(length){
+  return (length == 2 || length == 3)?length:false;
+}
+
+module.exports = Circle;
+
+},{"./Vec2":6}],16:[function(require,module,exports){
+var Vec2 = require("./Vec2");
+
+
+function Line(slope,intercept,boo){
+  if(typeof arguments[0] == "number" && typeof arguments[1] == "number"){
+    if(boo){
+      this.inv_slope = slope;
+      this.xint = intercept
+      this.true_slope = 1/this.inv_slope;
+      this.yint = -this.true_slope*this.xint;
+    }else{
+      this.true_slope = slope;
+      this.yint = intercept
+      this.inv_slope = 1/this.true_slope;
+      this.xint = -this.inv_slope*this.yint;
+    }
+    this.limits = [new Vec2(0,yint),new Vec2(0,xint)];
+    this.slope = limits[0].sub(limits[1]);
+    return;
+  }
+  var args = Vec2.overloadArguments(
+    arguments,
+    Line.lengthTest
+  );
+  if(args[i-1].equals(args[i])){
+    throw new Error("Cannot create a line from equivalent values")
+  }
+
+  this.limits = [args[0], args[1]];
+  this.mid = args[0].add(args[1]).scale(1/2);
+  this.slope = args[0].sub(args[1]);
   this.inv_slope = (this.slope.y == 0)?false:this.slope.x/this.slope.y;
   this.true_slope = (this.slope.x == 0)?false:this.slope.y/this.slope.x;
-  this.yint = -this.true_slope*points[0].x + points[0].y
-  this.xint = -this.inv_slope*points[0].y + points[0].x
+  this.yint = -this.true_slope*args[0].x + args[0].y
+  this.xint = -this.inv_slope*args[0].y + args[0].x
 }
 
+Line.prototype.length = function(){
+  return this.limits[0].dist(this.limits[1]);
+}
+
+Line.prototype.getPerpendicularBisect = function(){
+  var yint = -this.inv_slope*mid.x + mid.y;
+  return new Line(this.inv_slope, yint);
+}
+
+Line.prototype.opposite = function(){
+  return this.limits[1].y - this.limits[0].y;
+}
+
+Line.prototype.adjacent = function(){
+  return this.limits[1].x - this.limits[0].x;
+}
+
+
 Line.prototype.getIntersection = function(B1,B2){
-  var slopeB = B1.pos.sub(B2.pos);
+
+  var lineB = (B1 instanceof Line)?B1:new Line(B1,B2);
 
   // unlikely
-  if(this.slope.equals(slopeB)) return false;
+  if(this.slope.equals(lineB.slope)) return false;
 
   var intersect = new Vec2();
   //This should take care of any special conditions
-  if(this.slope.x === 0 || slopeB.x === 0){
-    if(this.slope.x == slopeB.x) return false;
+  if(this.slope.x === 0 || lineB.slopeB.x === 0){
+    if(this.slope.x == lineB.slopeB.x) return false;
     if(this.slope.y === 0 || slopeB.y === 0){
       return new Vec2(
-        (this.slope.x === 0)?this.xint:B1.x,
-        (this.slope.y === 0)?this.yint:B1.y
+        (this.slope.x === 0)?this.xint:lineB.xint,
+        (this.slope.y === 0)?this.yint:lineB.yint
       );
     }
 
     //I don't care which one is which
     var true_slope_A = this.inv_slope;
-    var true_slope_B = slopeB.x/slopeB.y;
+    var true_slope_B = lineB.inv_slope;
     //calculate in respect to X
     var bA = this.xint;
-    var bB = -true_slope_B*B1.y + B1.x;
+    var bB = lineB.xint;
     intersect.y = (bA-bB)/(true_slope_B-true_slope_A);
     intersect.x = true_slope_A*intersect.y + bA;
   }else{
     var true_slope_A = this.true_slope;
-    var true_slope_B = slopeB.y/slopeB.x;
+    var true_slope_B = lineB.true_slope;
     if(true_slope_A == true_slope_B) return false;
     var bA = this.yint;
-    var bB = -true_slope_B*B1.x + B1.y;
+    var bB = lineB.yint;
     intersect.x = (bA-bB)/(true_slope_B-true_slope_A);
     intersect.y = true_slope_A*intersect.x + bA;
   }
@@ -1185,6 +1336,9 @@ Line.prototype.getIntersection = function(B1,B2){
 
 }
 
+Line.lengthTest = function(length){
+  return (length == 2)?2:false;
+}
 
 Line.getIntersection = function(A1,A2,B1,B2){
   var slopeA = A1.pos.sub(A2.pos);
@@ -1226,6 +1380,379 @@ Line.getIntersection = function(A1,A2,B1,B2){
 }
 
 module.exports = Line;
+
+},{"./Vec2":6}],14:[function(require,module,exports){
+
+var Vec2 = require("./Vec2");
+var Line = require("./Line");
+var Circle = require("./Circle");
+var Delaney = require("delaunay-fast")
+
+function Polygon(points){
+  if(arguments.length == 0){
+    points = [];
+  }
+  if(points instanceof Polygon)
+    return points;
+  points = Vec2.overloadArguments(
+    arguments,
+    Polygon.lengthTest
+  );
+  for(var i in Polygon.prototype){
+    Object.defineProperty(points,i,{
+      enumerable: false,
+      value:Polygon.prototype[i].bind(points)
+    });
+  }
+  return points;
+}
+
+Polygon.prototype.clone = function(){
+  var points = this.slice(0);
+  for(var i in Polygon.prototype){
+    Object.defineProperty(points,i,{
+      enumerable: false,
+      value:Polygon.prototype[i].bind(points)
+    });
+  }
+  return points;
+}
+
+
+Polygon.prototype.forThree = function(fn,skip){
+  var l = this.length;
+  for(var i=skip||0;i<l;i++){
+    var prev = (i+l-1)%l;//((i == 0)?l:i) -1
+    var curr = i;
+    var next = (i+1)%l; //i == l-1?0:i+1
+    fn.call(this,this[prev],this[curr],this[next], curr);
+  }
+}
+
+Polygon.prototype.getIntersects = function(tprev,tcurr,skip){
+  //creating smaller aabbs
+  //We're going to detect intersection by slope
+  //however, the point of intersection may be outside of the of the possible area
+  //as a result we're creating a smaller aabb thats the maxes and minimums of the current area
+
+  var tAABB = {
+    max: tprev.max(tcurr),
+    min: tprev.min(tcurr)
+  };
+  var tAB_line = new Line(tprev,tcurr);
+
+  var intersections = [];
+
+  this.forThree(function(oprev,ocurr,onext){
+    if(tcurr == ocurr) return;
+    if(tcurr == oprev) return;
+    if(oprev == tcurr) return;
+    var oAABB = {
+      max: oprev.max(ocurr),
+      min: oprev.min(ocurr)
+    };
+
+    if(tAABB.min.x >= oAABB.max.x) return;
+    if(tAABB.min.y >= oAABB.max.y) return;
+    if(oAABB.min.x >= tAABB.max.x) return;
+    if(oAABB.min.y >= tAABB.max.y) return;
+
+    //I would like to cache the oprev->ocurr line if possible
+    //I would also prefer searching only for lines with the appropiate AABBs
+    var intersect = tAB_line.getIntersection(oprev,ocurr);
+    if(!intersect) return;
+
+    var netAABB = {
+      max: oAABB.max.min(tAABB.max),
+      min: oAABB.min.max(tAABB.min)
+    };
+    //If intersect point isn't between the two points, this isn't for us.
+    if(intersect.x >= netAABB.max.x) return;
+    if(intersect.y >= netAABB.max.y) return;
+    if(intersect.x <= netAABB.min.x) return;
+    if(intersect.y <= netAABB.min.y) return;
+
+    intersections.push(intersect);
+
+  },skip);
+
+  return intersections;
+}
+
+Polygon.prototype.getMidPoint = function(){
+  var l = points.length;
+  var mid = new Vec2();
+  this.forEach(function(point){
+    mid = mid.add(point.scale(1/l));
+  })
+  return mid;
+}
+
+Polygon.prototype.getArea = function(){
+  var net = 0;
+  //http://www.wikihow.com/Calculate-the-Area-of-a-Polygon
+  this.forThree(function(a,b,c){
+    net += b.cross(c);
+  })
+  return net;
+}
+
+Polygon.prototype.getAABB = function(){
+  var max = new Vec2(-Number.Infinity,-Number.Infinity);
+  var min = new Vec2(Number.Infinity,Number.Infinity);
+  this.forEach(function(point){
+    max = max.max(point);
+    min = min.min(point);
+  })
+  return {max:max,min:min};
+}
+
+Polygon.prototype.getDelaney = function(){
+  return Delaney.triangulate(this,"asArray");
+}
+
+
+Polygon.lengthTest = function(length){
+  return (length>3)?length:false;
+}
+
+module.exports = Polygon;
+
+},{"./Circle":15,"./Line":16,"./Vec2":6,"delaunay-fast":17}],17:[function(require,module,exports){
+var Delaunay;
+
+(function() {
+  "use strict";
+
+  var EPSILON = 1.0 / 1048576.0;
+
+  function supertriangle(vertices) {
+    var xmin = Number.POSITIVE_INFINITY,
+        ymin = Number.POSITIVE_INFINITY,
+        xmax = Number.NEGATIVE_INFINITY,
+        ymax = Number.NEGATIVE_INFINITY,
+        i, dx, dy, dmax, xmid, ymid;
+
+    for(i = vertices.length; i--; ) {
+      if(vertices[i][0] < xmin) xmin = vertices[i][0];
+      if(vertices[i][0] > xmax) xmax = vertices[i][0];
+      if(vertices[i][1] < ymin) ymin = vertices[i][1];
+      if(vertices[i][1] > ymax) ymax = vertices[i][1];
+    }
+
+    dx = xmax - xmin;
+    dy = ymax - ymin;
+    dmax = Math.max(dx, dy);
+    xmid = xmin + dx * 0.5;
+    ymid = ymin + dy * 0.5;
+
+    return [
+      [xmid - 20 * dmax, ymid -      dmax],
+      [xmid            , ymid + 20 * dmax],
+      [xmid + 20 * dmax, ymid -      dmax]
+    ];
+  }
+
+  function circumcircle(vertices, i, j, k) {
+    var x1 = vertices[i][0],
+        y1 = vertices[i][1],
+        x2 = vertices[j][0],
+        y2 = vertices[j][1],
+        x3 = vertices[k][0],
+        y3 = vertices[k][1],
+        fabsy1y2 = Math.abs(y1 - y2),
+        fabsy2y3 = Math.abs(y2 - y3),
+        xc, yc, m1, m2, mx1, mx2, my1, my2, dx, dy;
+
+    /* Check for coincident points */
+    if(fabsy1y2 < EPSILON && fabsy2y3 < EPSILON)
+      throw new Error("Eek! Coincident points!");
+
+    if(fabsy1y2 < EPSILON) {
+      m2  = -((x3 - x2) / (y3 - y2));
+      mx2 = (x2 + x3) / 2.0;
+      my2 = (y2 + y3) / 2.0;
+      xc  = (x2 + x1) / 2.0;
+      yc  = m2 * (xc - mx2) + my2;
+    }
+
+    else if(fabsy2y3 < EPSILON) {
+      m1  = -((x2 - x1) / (y2 - y1));
+      mx1 = (x1 + x2) / 2.0;
+      my1 = (y1 + y2) / 2.0;
+      xc  = (x3 + x2) / 2.0;
+      yc  = m1 * (xc - mx1) + my1;
+    }
+
+    else {
+      m1  = -((x2 - x1) / (y2 - y1));
+      m2  = -((x3 - x2) / (y3 - y2));
+      mx1 = (x1 + x2) / 2.0;
+      mx2 = (x2 + x3) / 2.0;
+      my1 = (y1 + y2) / 2.0;
+      my2 = (y2 + y3) / 2.0;
+      xc  = (m1 * mx1 - m2 * mx2 + my2 - my1) / (m1 - m2);
+      yc  = (fabsy1y2 > fabsy2y3) ?
+        m1 * (xc - mx1) + my1 :
+        m2 * (xc - mx2) + my2;
+    }
+
+    dx = x2 - xc;
+    dy = y2 - yc;
+    return {i: i, j: j, k: k, x: xc, y: yc, r: dx * dx + dy * dy};
+  }
+
+  function dedup(edges) {
+    var i, j, a, b, m, n;
+
+    for(j = edges.length; j; ) {
+      b = edges[--j];
+      a = edges[--j];
+
+      for(i = j; i; ) {
+        n = edges[--i];
+        m = edges[--i];
+
+        if((a === m && b === n) || (a === n && b === m)) {
+          edges.splice(j, 2);
+          edges.splice(i, 2);
+          break;
+        }
+      }
+    }
+  }
+
+  Delaunay = {
+    triangulate: function(vertices, key) {
+      var n = vertices.length,
+          i, j, indices, st, open, closed, edges, dx, dy, a, b, c;
+
+      /* Bail if there aren't enough vertices to form any triangles. */
+      if(n < 3)
+        return [];
+
+      /* Slice out the actual vertices from the passed objects. (Duplicate the
+       * array even if we don't, though, since we need to make a supertriangle
+       * later on!) */
+      vertices = vertices.slice(0);
+
+      if(key)
+        for(i = n; i--; )
+          vertices[i] = vertices[i][key];
+
+      /* Make an array of indices into the vertex array, sorted by the
+       * vertices' x-position. */
+      indices = new Array(n);
+
+      for(i = n; i--; )
+        indices[i] = i;
+
+      indices.sort(function(i, j) {
+        return vertices[j][0] - vertices[i][0];
+      });
+
+      /* Next, find the vertices of the supertriangle (which contains all other
+       * triangles), and append them onto the end of a (copy of) the vertex
+       * array. */
+      st = supertriangle(vertices);
+      vertices.push(st[0], st[1], st[2]);
+      
+      /* Initialize the open list (containing the supertriangle and nothing
+       * else) and the closed list (which is empty since we havn't processed
+       * any triangles yet). */
+      open   = [circumcircle(vertices, n + 0, n + 1, n + 2)];
+      closed = [];
+      edges  = [];
+
+      /* Incrementally add each vertex to the mesh. */
+      for(i = indices.length; i--; edges.length = 0) {
+        c = indices[i];
+
+        /* For each open triangle, check to see if the current point is
+         * inside it's circumcircle. If it is, remove the triangle and add
+         * it's edges to an edge list. */
+        for(j = open.length; j--; ) {
+          /* If this point is to the right of this triangle's circumcircle,
+           * then this triangle should never get checked again. Remove it
+           * from the open list, add it to the closed list, and skip. */
+          dx = vertices[c][0] - open[j].x;
+          if(dx > 0.0 && dx * dx > open[j].r) {
+            closed.push(open[j]);
+            open.splice(j, 1);
+            continue;
+          }
+
+          /* If we're outside the circumcircle, skip this triangle. */
+          dy = vertices[c][1] - open[j].y;
+          if(dx * dx + dy * dy - open[j].r > EPSILON)
+            continue;
+
+          /* Remove the triangle and add it's edges to the edge list. */
+          edges.push(
+            open[j].i, open[j].j,
+            open[j].j, open[j].k,
+            open[j].k, open[j].i
+          );
+          open.splice(j, 1);
+        }
+
+        /* Remove any doubled edges. */
+        dedup(edges);
+
+        /* Add a new triangle for each edge. */
+        for(j = edges.length; j; ) {
+          b = edges[--j];
+          a = edges[--j];
+          open.push(circumcircle(vertices, a, b, c));
+        }
+      }
+
+      /* Copy any remaining open triangles to the closed list, and then
+       * remove any triangles that share a vertex with the supertriangle,
+       * building a list of triplets that represent triangles. */
+      for(i = open.length; i--; )
+        closed.push(open[i]);
+      open.length = 0;
+
+      for(i = closed.length; i--; )
+        if(closed[i].i < n && closed[i].j < n && closed[i].k < n)
+          open.push(closed[i].i, closed[i].j, closed[i].k);
+
+      /* Yay, we're done! */
+      return open;
+    },
+    contains: function(tri, p) {
+      /* Bounding box test first, for quick rejections. */
+      if((p[0] < tri[0][0] && p[0] < tri[1][0] && p[0] < tri[2][0]) ||
+         (p[0] > tri[0][0] && p[0] > tri[1][0] && p[0] > tri[2][0]) ||
+         (p[1] < tri[0][1] && p[1] < tri[1][1] && p[1] < tri[2][1]) ||
+         (p[1] > tri[0][1] && p[1] > tri[1][1] && p[1] > tri[2][1]))
+        return null;
+
+      var a = tri[1][0] - tri[0][0],
+          b = tri[2][0] - tri[0][0],
+          c = tri[1][1] - tri[0][1],
+          d = tri[2][1] - tri[0][1],
+          i = a * d - b * c;
+
+      /* Degenerate tri. */
+      if(i === 0.0)
+        return null;
+
+      var u = (d * (p[0] - tri[0][0]) - b * (p[1] - tri[0][1])) / i,
+          v = (a * (p[1] - tri[0][1]) - c * (p[0] - tri[0][0])) / i;
+
+      /* If we're outside the tri, fail. */
+      if(u < 0.0 || v < 0.0 || (u + v) > 1.0)
+        return null;
+
+      return [u, v];
+    }
+  };
+
+  if(typeof module !== "undefined")
+    module.exports = Delaunay;
+})();
 
 },{}]},{},[1])
 ;

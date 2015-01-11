@@ -7,6 +7,7 @@ var watch = require("node-watch");
 
 if(process.env.WATCH){
   console.log("Watching: "+__dirname+"/lib");
+  build();
   watch(__dirname+"/lib", function(filename) {
     build();
   });
@@ -15,15 +16,12 @@ if(process.env.WATCH){
 }
 
 function build(){
-  try{
-    var b = browserify(__dirname+"/lib/dist.js", {basedir:__dirname+"/lib"});
-  }catch(e){
-    console.log("Browserify Error");
-    console.log(e.stack);
-    return;
-  }
+  var b = browserify(__dirname+"/lib/dist.js", {basedir:__dirname+"/lib"});
   var writer = new fs.createWriteStream(__dirname+"/js/verlet-"+pack.version+".js");
   var bund = b .bundle();
+  bund.on("error",function(e){
+    console.log(e.stack);
+  });
   bund.pipe(writer).on("finish",function(){
     writer.close(function(){
       try{
