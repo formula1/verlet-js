@@ -9,7 +9,8 @@
 	"scripts": {
 		"test": "echo \"Error: no test specified\" && exit 1",
 		"build": "node build.js",
-		"watch-build": "WATCH=true node build.js"
+		"watch-build": "WATCH=true node build.js",
+		"watch-build-test": "VERLET_WATCH=true VERLET_TEST=true node build.js"
 	},
 	"repository": {
 		"type": "git",
@@ -34,6 +35,7 @@
 	},
 	"devDependencies": {
 		"node-watch": "latest",
+		"async": "latest",
 		"browserify": "~2.18.1",
 		"uglify-js": "~2.3.6"
 	}

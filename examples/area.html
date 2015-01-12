@@ -42,24 +42,41 @@ window.onload = function() {
   var draw = new VerletDraw(width, height, canvas);
   var sim = draw.physics
   sim.friction = 1;
-  var origin = new Vec2(width/4,height/4);
   var points = 7;
   var distance = 100;
-  var offset = origin.add(new Vec2(distance,0));
-  var vs =[];
-  for(var i=0;i<points;i++){
-    vs.push(offset.rotate(origin,2*Math.PI*i/points));
-  }
-  // entities
-  var linearblob = sim.lineSegments(vs, 0.02,true);
+  var rot = 2*Math.PI/points;
 
-  linearblob.constraints.push(new AreaConstraint(linearblob.particles,1.5));
+
+  var linearblob = new sim.Composite();
+  var line_orig = new Vec2(width/4,height/4)
+  var line_off = line_orig.clone().sub(new Vec2(distance,0));
 
   var angularblob = new sim.Composite();
-  origin = new Vec2(width*3/4,height*3/4);
-  for(i=0;i<points+2;i++){
+  var angu_orig = new Vec2(width*3/4,height*1/4);
+  var angu_off = angu_orig.clone().sub(new Vec2(distance,0));
+
+  var soloblob = new sim.Composite();
+  var solo_orig = new Vec2(width*1/2,height*1/4);
+  var solo_off = solo_orig.clone().sub(new Vec2(distance,0));
+
+  for(var i=0;i<points+2;i++){
     if(i < points){
-      angularblob.particles.push(new Particle(offset.rotate(origin,2*Math.PI*i/points)));
+      linearblob.particles.push(
+        new Particle(line_off.rotate(line_orig,rot).clone())
+      );
+      angularblob.particles.push(
+        new Particle(angu_off.rotate(angu_orig,rot).clone())
+      );
+      soloblob.particles.push(
+        new Particle(solo_off.rotate(solo_orig,rot).clone())
+      );
+    }
+    if(i > 0 && i < points+1){
+      linearblob.constraints.push(new DistanceConstraint(
+        composite.particles[i%points],
+        composite.particles[i-1],
+        0.02
+      ));
     }
     if(i > 1){
       angularblob.constraints.push(new AngleConstraint(
@@ -70,7 +87,13 @@ window.onload = function() {
       ));
     }
   }
+  // entities
+  console.log(linearblob.particles);
+  console.log(angularblob.particles);
+  console.log(soloblob.particles);
+  linearblob.constraints.push(new AreaConstraint(linearblob.particles,1));
   angularblob.constraints.push(new AreaConstraint(angularblob.particles,1));
+  soloblob.constraints.push(new AreaConstraint(soloblob.particles,1));
 
 //  sim.composites.push(angularblob);
 
