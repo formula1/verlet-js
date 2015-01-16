@@ -74,3 +74,13 @@ assert("Point is Above",
 .pointIsLeftOrTop(new Vec2(0,1))
 )
 )
+assert("Point is right",
+!( new Line(new Vec2(0,2), new Vec2(0,-2))
+.pointIsLeftOrTop(new Vec2(1,0))
+)
+)
+assert("Point is Above",
+!( new Line(new Vec2(2,0), new Vec2(-2,0))
+.pointIsLeftOrTop(new Vec2(0,-1))
+)
+)
