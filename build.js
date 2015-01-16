@@ -16,12 +16,18 @@ if(process.env.VERLET_WATCH){
   build();
 }
 
+process.stdin.on("data", function(data){
+  if(data.toString() == "\n")
+    build();
+})
+
 function build(){
   var b = browserify(__dirname+"/lib/dist.js", {basedir:__dirname+"/lib"});
   var writer = new fs.createWriteStream(__dirname+"/js/verlet-"+pack.version+".js");
   var bund = b .bundle();
   bund.on("error",function(e){
-    console.log(e.stack);
+    console.log("Bundle Error");
+    console.log(e);
     return;
   });
   bund.pipe(writer).on("finish",function(){
@@ -35,7 +41,7 @@ function build(){
       }
       fs.writeFileSync(__dirname+"/js/verlet-"+pack.version+".min.js");
       if(!process.env.VERLET_TEST) return;
-      
+
       tester(function(clean){
         if(clean) console.log("done: "+Date.now());
       });

@@ -92,9 +92,9 @@ window.onload = function() {
   console.log(linearblob.particles);
   console.log(angularblob.particles);
   console.log(soloblob.particles);
-  linearblob.constraints.push(new MidpointAreaConstraint(linearblob.particles,1));
-  angularblob.constraints.push(new MidpointAreaConstraint(angularblob.particles,1));
-  soloblob.constraints.push(new MidpointAreaConstraint(soloblob.particles,1));
+  linearblob.constraints.push(new ScaledAreaConstraint(linearblob.particles,1));
+  angularblob.constraints.push(new ScaledAreaConstraint(angularblob.particles,1));
+  soloblob.constraints.push(new ScaledAreaConstraint(soloblob.particles,1));
 
   sim.composites.push(linearblob);
 //  sim.composites.push(angularblob);

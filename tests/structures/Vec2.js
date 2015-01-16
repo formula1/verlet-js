@@ -1,3 +1,4 @@
+require("../../lib/verlet-polyfill");
 var Vec2 = require("../../lib/structures/Vec2");
 
 var assert = function(label, expression) {
@@ -18,9 +19,14 @@ var ops = {
   "subtraction":["sub",[3,4],[new Vec2(1,2)],[2,2]],
   "multiply":["mul",[2,2],[new Vec2(2,1)],[4,2]],
   "divide":["div",[4,2],[new Vec2(2,2)],[2,1]],
-  "scale":["scale",[2,1],[3],[6,3]],
-  "set":["set",[2,1],[new Vec2(2,0)],[2,0]],
-  "rotate":["rotate",[2,0],[new Vec2(1,0), Math.PI/2],[1,1]]
+  "maximum":["max",[2,1],[new Vec2(0,5)],[2,5]],
+  "minimum":["min",[2,5],[new Vec2(4,0)],[2,0]],
+  "rotate":["rotate",[2,0],[new Vec2(1,0), Math.PI/2],[1,1]],
+  "set":["set",[1,1],[new Vec2(3,4)],[3,4]],
+  "normalize":["normalize",[3,4],[],[3/5,4/5]],
+  "scale":["scale",[3/5,4/5],[5],[3,4]],
+  "swap":["swap",[3,4],[],[4,3]],
+  "midpoint":["mid",[4,3],[new Vec2(-2,-1)],[1,1]],
 };
 for(var i in ops){
   var input = new Vec2(ops[i][1][0],ops[i][1][1]);
@@ -44,7 +50,7 @@ for(var i in ops){
   );
 }
 for(var i in ops){
-  var orig = new Vec2(input[0],input[1]);
+  var orig = new Vec2(ops[i][1][0],ops[i][1][1]);
   var clone = orig.clone();
   var op = ops[i][0];
   var args = ops[i][2];
@@ -52,10 +58,13 @@ for(var i in ops){
   clone[op].apply(clone,args);
   assert(
     "cloned "+i,
-    orig.equals(new Vec2(input[0], input[1])) && clone.equals(new Vec2(result[0], result[1]))
+    orig.equals(new Vec2(ops[i][1][0],ops[i][1][1])) &&
+    clone.equals(new Vec2(result[0], result[1]))
   );
 }
 
+assert("slope", (new Vec2(2,4)).slope() == 2);
+assert("sum", (new Vec2(2,4)).sum() == 6);
 assert("length", (new Vec2(3,4)).length() == 5);
 assert("length2", (new Vec2(3,4)).length2() == 25);
 assert("dist", (new Vec2(0,4)).dist(new Vec2(3,0)) == 5);

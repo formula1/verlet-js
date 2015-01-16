@@ -2,6 +2,7 @@
 
 //this exports all the verlet methods globally, so that the demos work.
 
+require("./verlet-polyfill");
 var VerletDraw = require('./verlet-draw')
 var VerletJS = require('./verlet')
 var constraint = require('./constraint')
@@ -12,12 +13,44 @@ window.VerletDraw = VerletDraw;
 
 window.Particle = VerletJS.Particle
 
-window.DistanceConstraint = constraint.DistanceConstraint
-window.PinConstraint      = constraint.PinConstraint
-window.AngleConstraint    = constraint.AngleConstraint
-window.AreaConstraint    = constraint.AreaConstraint
+for(var i in constraint){
+	window[i] = constraint[i]
+}
 
-},{"./constraint":4,"./objects":5,"./structures/Vec2":6,"./verlet":3,"./verlet-draw":2}],6:[function(require,module,exports){
+},{"./constraint":5,"./objects":6,"./structures/Vec2":7,"./verlet":4,"./verlet-draw":3,"./verlet-polyfill":2}],2:[function(require,module,exports){
+if(!Math.sign){
+  Math.sign = function(x){
+    if( +x === x ) { // check if a number was given
+      return (x === 0) ? x : (x > 0) ? 1 : -1;
+    }
+    return NaN;
+  }
+}
+
+if(!Math.quadratic){
+  //x = (-b +- b*b - 4ac )/(2a)
+  Math.quadratic = function(a,b,c){
+    var ret = b*b - 4*a*c;
+    if(ret < 0) return false;
+    if(ret == 0) return [-b/(2*a)];
+    a *= 2;
+    ret = Math.sqrt(ret)/a;
+    b *= -1/a
+    return [b + ret, b - ret];
+  }
+}
+
+if(!Math.lawCos){
+  //x = (-b +- b*b - 4ac )/(2a)
+  Math.lawCos = function(a,b,c){
+    Math.acos(
+      (-a*a + b*b + c*c)/
+      (2*b*c)
+    );
+  }
+}
+
+},{}],7:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -98,6 +131,13 @@ Vec2.prototype.scale = function(coef) {
 	return this;
 }
 
+Vec2.prototype.pow = function(num){
+	this.x = Math.pow(this.x,num);
+	this.y = Math.pow(this.y,num);
+	return this;
+}
+
+
 Vec2.prototype.normalize = function(){
 	var len = this.length();
 	this.x /= len;
@@ -124,6 +164,12 @@ Vec2.prototype.min = function(v){
 	return this;
 }
 
+Vec2.prototype.mid = function(v){
+	this.x = (this.x+v.x)/2;
+	this.y = (this.y+v.y)/2;
+	return this;
+}
+
 Vec2.prototype.max = function(v){
 	this.x = Math.max(this.x, v.x);
 	this.y = Math.max(this.y, v.y);
@@ -135,6 +181,14 @@ Vec2.prototype.set = function(v) {
 	this.y = v.y;
 	return this;
 }
+
+Vec2.prototype.swap = function() {
+	var temp = this.x;
+	this.x = this.y;
+	this.y = temp;
+	return this;
+}
+
 
 Vec2.prototype.equals = function(v) {
 	return this.x == v.x && this.y == v.y;
@@ -178,63 +232,20 @@ Vec2.prototype.angle2 = function(vLeft, vRight) {
 	return vLeft.clone().sub(this).angle(vRight.clone().sub(this));
 }
 
+Vec2.prototype.slope = function(){
+	return this.y / this.x;
+}
+
+Vec2.prototype.sum = function(){
+	return this.y + this.x;
+}
+
+
 Vec2.prototype.toString = function() {
 	return "(" + this.x + ", " + this.y + ")";
 }
 
-Vec2.overloaded = function(){
-	if(arguments.length > 2){
-		throw new Error("improper number of arguments");
-	}
-	if(arguments.length == 0){
-		return new Vec2();
-	}
-	if(arguments.length == 2){
-		if(typeof arguments[0] != "number" || typeof arguments[1] != "number"){
-			throw new Error("2 numbers are required when providing 2 arguments");
-		}
-	}
-	if(arguments.length == 1){
-		if(arguments[0] instanceof Vec2){
-			return arguments[0];
-		}
-		if(arguments[0].pos && arguments[0].pos instanceof Vec2){
-			return arguments[0].pos;
-		}
-		if(Array.isArray(arguments[0])){
-			if(x.length != 2){
-				throw new Error("Vec2 needs an array of 2 when providing an array");
-			}
-			return Vec2.overloaded(arguments[0][0],arguments[0][1]);
-		}
-		throw new Error("for one argument, a Vec2, Particle or an Array is required");
-	}
-}
-
-Vec2.overloadArguments = function(args,lengthTest,iterateTest){
-	var len;
-	if((len = lengthTest(args.length))){
-		args = Array.prototype.slice.call(args,0);
-	}else if(args.length == 1){
-		if(!Array.isArray(args[0])){
-			throw new Error("need either an Array or Arguments");
-		}
-		if(!(len = lengthTest(args[0].length))){
-			throw new Error("improper number of arguments in array");
-		}
-		args = args[0].slice(0);
-	}else{
-		console.log(args.length);
-		throw new Error("improper number of arguments");
-	}
-	for(var i=0;i<len;i++){
-		args[i] = Vec2.overloaded(args[i])
-		if(iterateTest) iterateTest(i,args);
-	}
-	return args;
-}
-
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 
 window.requestAnimFrame = window.requestAnimationFrame
 || window.webkitRequestAnimationFrame
@@ -278,6 +289,7 @@ function VerletDraw(width, height, canvas, physics) {
     var nearest = _this.physics.nearestEntity(_this.mouse,_this.selectionRadius);;
     if (nearest) {
       _this.draggedEntity = nearest;
+      console.log(nearest.pos);
     }
   };
 
@@ -330,7 +342,7 @@ VerletDraw.prototype.draw = function() {
   }
 }
 
-},{"./verlet.js":3}],3:[function(require,module,exports){
+},{"./verlet.js":4}],4:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -467,7 +479,7 @@ VerletJS.prototype.nearestEntity = function(target_vec2,radius) {
 	return entity;
 }
 
-},{"./structures/Composite":8,"./structures/Particle":7,"./structures/Vec2":6}],4:[function(require,module,exports){
+},{"./structures/Composite":9,"./structures/Particle":8,"./structures/Vec2":7}],5:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -502,9 +514,10 @@ var Vec2 = require("./structures/Vec2")
 exports.DistanceConstraint = require("./constraints/DistanceConstraint");
 exports.PinConstraint = require("./constraints/PinConstraint");
 exports.AngleConstraint = require("./constraints/AngleConstraint");
-exports.AreaConstraint = require("./constraints/AreaConstraint");
+exports.MidpointAreaConstraint = require("./constraints/AreaConstraint");
+exports.ScaledAreaConstraint = require("./constraints/InflateAreaConstraint");
 
-},{"./constraints/AngleConstraint":11,"./constraints/AreaConstraint":12,"./constraints/DistanceConstraint":9,"./constraints/PinConstraint":10,"./structures/Vec2":6}],5:[function(require,module,exports){
+},{"./constraints/AngleConstraint":12,"./constraints/AreaConstraint":13,"./constraints/DistanceConstraint":10,"./constraints/InflateAreaConstraint":14,"./constraints/PinConstraint":11,"./structures/Vec2":7}],6:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -567,7 +580,7 @@ VerletJS.prototype.lineSegments = function(vertices, stiffness, circle) {
 				composite.particles[0],
 				stiffness
 			)
-		);
+		)
 	}
 
 	this.composites.push(composite);
@@ -663,7 +676,7 @@ VerletJS.prototype.tire = function(origin, radius, segments, spokeStiffness, tre
 	return composite;
 }
 
-},{"./constraint":4,"./verlet":3}],8:[function(require,module,exports){
+},{"./constraint":5,"./verlet":4}],9:[function(require,module,exports){
 
 function Composite() {
   this.particles = [];
@@ -682,7 +695,7 @@ Composite.prototype.pin = function(index, pos) {
 
 module.exports = Composite;
 
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 function DistanceConstraint(a, b, stiffness, distance /*optional*/) {
   this.a = a;
   this.b = b;
@@ -708,7 +721,7 @@ DistanceConstraint.prototype.draw = function(ctx) {
 
 module.exports = DistanceConstraint;
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 function AngleConstraint(a, b, c, stiffness) {
   this.a = a;
   this.b = b;
@@ -748,7 +761,7 @@ AngleConstraint.prototype.relax = function(stepCoef) {
 
   module.exports = AngleConstraint;
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 var Vec2 = require("./Vec2")
 
 function Particle(pos) {
@@ -766,7 +779,7 @@ Particle.prototype.draw = function(ctx) {
 
 module.exports = Particle;
 
-},{"./Vec2":6}],10:[function(require,module,exports){
+},{"./Vec2":7}],11:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2")
 
 function PinConstraint(a, pos) {
@@ -787,7 +800,7 @@ PinConstraint.prototype.draw = function(ctx) {
 
 module.exports = PinConstraint;
 
-},{"../structures/Vec2":6}],12:[function(require,module,exports){
+},{"../structures/Vec2":7}],13:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
 var Triangle = require("../structures/Triangle");
 var Polygon = require("../structures/Polygon");
@@ -845,8 +858,23 @@ AreaConstraint.prototype.relax = function(stepCoef) {
 
 
   var _this = this;
+  var eq = false
+  var curr_array = [];
   this.points.forThree(function(prev,curr,next,i){
     var ok = true;
+    /*
+    if(curr.equals(next)){
+      eq = prev;
+      curr_array.push(curr);
+      return;
+    }
+    if(eq){
+      prev = eq;
+      eq = false;
+      curr_array.push(curr)
+
+    }
+    */
     var tri = new Triangle(prev,curr,next);
     if(tri.isConcave()){
       if(tri.hasPoint(_this.storedmid)){
@@ -855,26 +883,31 @@ AreaConstraint.prototype.relax = function(stepCoef) {
       var intersections = _this.points.getIntersects(prev,curr,i);
       if(intersections.length > 0){
         //alert("you may get a negative area here");
-        curr
-          .sub(mid)
-          .scale(diff)
-          .add(mid);
         ok = false;
       }
     }
-    if(ok){
-      curr
-        .sub(mid)
-        .scale(diff)
-        .add(mid);
-    }
+    if(ok){}
+    /*
+    if(curr_array.length){
+      while(curr_array.length){
+        _this.storedmid.add(
+          curr_array.pop().sub(mid).scale(diff).add(mid)
+          .clone().scale(1/l)
+        );
+      }
+    }else{
+    */
+      _this.storedmid.add(
+        curr.sub(mid).scale(diff).add(mid)
+        .clone().scale(1/l)
+      );
+//    }
+
     if(curr != _this.points[0]){
       _this.storedarea += prev.cross(curr);
     }
-    _this.storedmid.add(curr.clone().scale(1/l));
     _this.storedaabb.digestPoint(curr);
   })
-  _this.storedarea += this.points[l-1].cross(this.points[0]);
 }
 AreaConstraint.prototype.draw = function(ctx) {
   var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
@@ -884,17 +917,28 @@ AreaConstraint.prototype.draw = function(ctx) {
   var _this = this;
   var problem = false;
   var intersects = [];
+  var eq = false;
   this.points.forThree(function(prev,curr,next,i){
+    /*
+    if(curr.equals(next)){
+      eq = prev
+      return;
+    }
+    if(eq){
+      prev = eq;
+      eq = false;
+    }
+    */
     var tri = new Triangle(prev,curr,next);
     if(tri.isConcave()){
       if(tri.hasPoint(_this.storedmid)){
         problem = true;
       }
-      var intersections = _this.points.getIntersects(prev,curr,i);
-      if(intersections.length > 0){
-//        alert("you may get a negative area here");
-        intersects = intersects.concat(intersections);
-      }
+    }
+    var intersections = _this.points.getIntersects(prev,curr,i);
+    if(intersections.length > 0){
+      //        alert("you may get a negative area here");
+      intersects = intersects.concat(intersections);
     }
     ctx.lineTo(curr.x,curr.y);
   })
@@ -986,47 +1030,740 @@ There are a few issues here
 
 */
 
-},{"../structures/AABB":15,"../structures/Polygon":14,"../structures/Triangle":13,"../structures/Vec2":6}],13:[function(require,module,exports){
-var Vec2 = require("./Vec2");
-var Circle = require("./Circle");
+},{"../structures/AABB":15,"../structures/Polygon":17,"../structures/Triangle":16,"../structures/Vec2":7}],14:[function(require,module,exports){
+var Vec2 = require("../structures/Vec2");
+var Line = require("../structures/Line");
+var Triangle = require("../structures/Triangle");
+var Polygon = require("../structures/Polygon");
+var AABB = require("../structures/AABB")
 
 
-function Triangle(){
-  var args = Vec2.overloadArguments(
-    arguments,
-    Triangle.lengthTest,
-    Triangle.iterateTest
+function AreaConstraint(points, stiffness) {
+  if(Array.isArray(points)){
+    //nothing
+  }else{
+    points = Array.prototype.slice.call(arguments,0);
+    stiffness = points.pop();
+  }
+  if(points.length < 3){
+    throw new Error("need at least three points in args or as an array to retain an area");
+  }
+  this.points = Polygon(points);
+  this.area = this.points.getArea();
+  this.storedarea = 0;
+  this.storedmid = 0;
+  this.storedaabb = new AABB();
+  if(!this.area || this.area == 0){
+    throw new Error("cannot calculate a nonexistant area");
+  }
+  this.stiffness = stiffness;
+}
+
+AreaConstraint.prototype.relax = function(stepCoef) {
+  var area = 0;//the current area
+  var mid = new Vec2();
+  //var perimeter = 0;
+  var l = this.points.length;
+  this.points.forThree(function(prev,curr,next){
+    area += curr.cross(next);
+    mid.add(curr.clone().scale(1/l))
+    //perimeter += curr.dist(next);
+  })
+  if(area <= 0){
+    alert("negative area");
+    throw new Error("negative area");
+  }
+
+  //I have the two areas
+  var diff = (
+    this.area* //The desired area
+    (this.stiffness*stepCoef)
+    +(1-this.stiffness*stepCoef)
+    *area
+  )/area;
+
+
+//  b = Math.sqrt(Area*(Sin(B)*Sin(90))/(Sin(A)*Sin(C)))
+
+  var _this = this;
+  var eq = false
+  var lastcurr = this.points[this.points.length-1];
+  var lastnext = this.points[0].clone();
+  var _prev = this.points[this.points.length-1];
+  var nm = new Vec2();
+  this.points.forThree(function(prev,curr,next,i){
+    //If I didn't need every length, I wouldn't grab it
+    var la = curr.dist(next);
+    var lb = next.dist(_prev);
+    var lc = _prev.dist(curr);
+
+    var nl = curr.clone();
+    //subtract old prev, normalize, scale to new length, add new prev
+    curr.sub(_prev).scale(diff).add(prev);
+    nm.add(curr.clone().scale(1/l))
+    /*    */
+    // set a
+    _prev = nl;
+    /*
+
+    var Aa = Math.acos((lb*lb + lc*lc -la*la) / (2*lb*lc) );
+    var Aasin = Math.sin(Aa); //Cache the sine
+
+    //    var Ab = Math.asin(lb*Aasin/la);
+//    var Absin = Math.sin(Ab);
+//    var Ac = Math.asin(lc*Aasin/la);
+//    var Acsin = Math.sin(Ac);
+
+    // A = b*h / 2
+    // If a line would be created at Angle B that is perpendicular to the base
+    // both line c and line a would now be considered hypotenuses
+    // we consider one the hypotenuse and the otherone now has the opposite angle
+    // Law of sines - opp/sin(A) = linec/(sin(90) = 1)
+    // opp = sin(A)*linec
+//    var Area = 0.5 * lb * Aasin*lc;
+    //this is an alternative, though we already have the sine so it may be slower
+//    var Area = curr.cross(next) + next.cross(prev) + prev.cross(curr);
+/*
+heavy abuse of law of sines
+ lc = lb*sin(C)/sin(B)
+ Area = .5 * lb * sin(A) * lb * sin(C) / sin(B)
+ Area * sin(B) * 2 / sin(A) /sin(C) = lb^2
+ sqrt(Area * sin(B) * 2 / sin(A) /sin(C)) = lb
+  var nb = Math.sqrt(
+    Area * 2 * (Absin)
+  /
+    (Aasin * Acsin)
+  );
+  I would never use Sin(C) nor sin(B) again
+  var nc = Math.sqrt(
+    Area * 2 * Math.asin(lc*Aasin/la)
+  /
+    (Aasin * Math.asin(lb*Aasin/la))
+  );
+
+  var nc = Math.sqrt(
+    0.5 * lb * Aasin * lc * 2 Math.asin(lc*Aasin/la)
+  /
+    (Aasin * Math.asin(lb*Aasin/la))
+
+  var nc = Math.sqrt(
+    lb * Aasin * lc * Math.asin(lc*Aasin/la)
+  /
+    (Aasin * Math.asin(lb*Aasin/la))
   )
-  this.A = args[0];
-  this.B = args[1];
-  this.C = args[2];
+
+  var nc = Math.sqrt(
+    lb * lc * Math.asin(lc*Aasin/la)
+  /
+    Math.asin(lb*Aasin/la)
+  }
+*/
+//  NewSmallArea/SmallArea = NewBigArea/BigArea
+//  NewSmallArea = NewBigArea*SmallArea/BigArea
+
+//Done in one sweep
+/*
+    var nc = Math.sqrt(
+      lb * lc * Math.asin(lc*Aasin/la)
+    /
+      (Math.asin(lb*Aasin/la) )
+    );
+
+
+    //store the next points old prev
+    var nl = curr.clone()
+    //subtract old prev, normalize, scale to new length, add new prev
+    curr.sub(_prev).normalize().scale(nc).add(prev);
+    nm.add(curr.clone().scale(1/l))
+/*    */
+    // set a
+//    _prev = nl;
+  })
+  while(l--){
+    this.points[l].sub(nm).add(mid);
+  }
+  this.storedarea = area*diff;
+  this.storedmid = nm;
+
+}
+AreaConstraint.prototype.draw = function(ctx) {
+  var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
+  var inv = Math.floor(Math.min(255,255*this.storedarea/this.area));
+  var _this = this;
+  var problem = false;
+  var intersects = [];
+  var eq = false;
+  var effectivepoints = [];
+  //delaney
+  var tri = this.points.getDelaney();
+  for(i = tri.length; i; ) {
+    ctx.beginPath();
+    --i; ctx.moveTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+
+  //draw perimiter
+  ctx.lineWidth = 4;
+  this.points.forThree(function(prev,curr,next,i){
+    if(curr.equals(next)){
+      eq = eq||prev
+      return;
+    }
+    if(eq){
+      prev = eq;
+      eq = false;
+    }
+    effectivepoints.push(curr);
+    var tri = new Triangle(prev,curr,next);
+    ctx.beginPath();
+    ctx.arc(
+      curr.x,
+      curr.y,
+      4, 0, 2 * Math.PI, false
+    );
+    ctx.fillStyle = "#FFFF00";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(
+      prev.x,
+      prev.y,
+      4, 0, 2 * Math.PI, false
+    );
+    ctx.fillStyle = "#FF00FF";
+    ctx.fill();
+    var mp = tri.getConcaveBisector();
+    ctx.beginPath();
+    ctx.arc(
+      mp.mid.x,
+      mp.mid.y,
+      8, 0, 2 * Math.PI, false
+    );
+    ctx.fillStyle = "#FF00FF";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(
+      mp.B.x,
+      mp.B.y,
+      8, 0, 2 * Math.PI, false
+    );
+    ctx.fillStyle = "#FFFF00";
+    ctx.fill();
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.moveTo(mp.mid.x,mp.mid.y);
+    ctx.lineTo(mp.B.x,mp.B.y);
+    ctx.stroke();
+
+    if( tri.CA.pointIsLeftOrTop(mp.B) != tri.CA.pointIsLeftOrTop(tri.B)){
+
+      ctx.strokeStyle = "#FFFF00";
+      if(tri.hasPoint(_this.storedmid)){
+        problem = true;
+      }
+    }else{
+      ctx.strokeStyle = "#FF00FF";
+    }
+    var intersections = _this.points.intersectsLine(new Line(prev,curr),i);
+    if(intersections.length > 0){
+      //        alert("you may get a negative area here");
+      intersects = intersects.concat(intersections);
+    }
+    ctx.beginPath();
+    ctx.moveTo((prev.x+curr.x)/2, (prev.y+curr.y)/2);
+    ctx.lineTo(curr.x,curr.y);
+    ctx.lineTo((next.x+curr.x)/2, (next.y+curr.y)/2);
+    ctx.stroke();
+  })
+  ctx.lineWidth = 1;
+  //fill
+  var l = effectivepoints.length-1;
+  ctx.beginPath();
+  ctx.moveTo(effectivepoints[l].x, effectivepoints[l].y);
+  while(l--){
+    ctx.lineTo(effectivepoints[l].x,effectivepoints[l].y);
+  }
+  var g = (diff < inv)?diff:inv;
+  ctx.closePath();
+  ctx.fillStyle="rgba("+diff+","+g+","+inv+",0.6)";
+  ctx.fill();
+
+  //intersects
+  for(var i=intersects.length;i--;){
+    ctx.beginPath();
+    ctx.arc(
+      intersects[i].x,
+      intersects[i].y,
+      8, 0, 2 * Math.PI, false
+    );
+    ctx.fillStyle = "#FF8300";
+    ctx.fill();
+  };
+
+  //midpoint
+  ctx.beginPath();
+  ctx.arc(
+    this.storedmid.x,
+    this.storedmid.y,
+    2, 0, 2 * Math.PI, false
+  );
+  ctx.fillStyle = problem?"#FF0000":"#00FF00";
+  ctx.fill();
 }
 
-Triangle.prototype.getCircumCircle = function(){
-  return Triangle.getCircumCircle(this.A,this.B,this.C);
-}
+module.exports = AreaConstraint;
 
-Triangle.prototype.isConcave = function(){
-  return Triangle.isConcave(this.A,this.B,this.C);
-}
+/*
+A = Pir^2
+P = 2Pir
+P/2Pi = r
+A = Pi*(P/(2Pi))^2
+A = Pi/Pi^2 * P/2
+A = P/2Pi
 
-Triangle.prototype.hasPoint = function(point){
-  return Triangle.hasPoint(this.A,this.B,this.C,point);
-}
+A = w*h
+A/w = h
+P = 2w+2h
+P/2 = w+h
+P/2 - w = h
+A = w*(P/2 - w)
+A = wP/2 - w^2
+P = 2w + 2A/w
 
-Triangle.lengthTest = function(length){
-  return (length == 3)?3:false;
-}
+A = 1/2 * b * h
+a/Sin(A) = b/Sin(b) = c/Sin(b)
+b = find max side
+c/Sin(90) = h/Sin(A)
+Sin(A)*c/Sin(90) = h
 
-Triangle.iterateTest = function(i,args){
-  if(i == 0) return;
-  if(args[i-1].equals(args[i])){
-    throw new Error("Cannot build when argument["+(i-1)+"] == argument["+i+"]");
+A = 1/2 * b * Sin(A)*c/Sin(90)
+P = a + b + c
+
+So we know Area
+-we know angles
+Now we need to figure out the distances
+
+a/Sin(A) = b/Sin(B) = c/Sin(C)
+
+A = Sin(A)* Sin(C) * b^2 / (Sin(B)*Sin(90))
+*/
+
+},{"../structures/AABB":15,"../structures/Line":18,"../structures/Polygon":17,"../structures/Triangle":16,"../structures/Vec2":7}],15:[function(require,module,exports){
+var Vec2 = require("./Vec2");
+
+function AABB (points){
+  this.max = new Vec2(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+  this.min = new Vec2(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+  if(points){
+    if(arguments.length > 1){
+      var l = arguments.length;
+      while(l--){this.digestPoint(arguments[l]);}
+    }else{
+      var l = points.length;
+      while(l--){this.digestPoint(points[l]);}
+    }
   }
 }
 
+AABB.prototype.digestPoint = function(point){
+  this.max.max(point);
+  this.min.min(point);
+}
 
-Triangle.getCircumCircle = function(a,b,c){
+AABB.prototype.intersectsAABB = function(oAABB){
+  if(this.min.x >= oAABB.max.x) return false;
+  if(this.min.y >= oAABB.max.y) return false;
+  if(oAABB.min.x >= this.max.x) return false;
+  if(oAABB.min.y >= this.max.y) return false;
+  return true;
+}
+
+AABB.prototype.containsPoint = function(point){
+  if(point.x >= this.max.x) return false;
+  if(point.y >= this.max.y) return false;
+  if(point.x <= this.min.x) return false;
+  if(point.y <= this.min.y) return false;
+  return true;
+}
+
+AABB.prototype.intersectsCircle = function(c){
+  if(c.containsPoint(this.max)) return true;
+  if(c.containsPoint(this.min)) return true;
+  if(c.containsPoint(this.min.x,this.max.y)) return true;
+  if(c.containsPoint(this.max.x,this.min.y)) return true;
+  return false;
+}
+
+module.exports = AABB;
+
+},{"./Vec2":7}],17:[function(require,module,exports){
+function Polygon(oPoints){
+  var i = oPoints.length;
+  var points = Array(i);
+  while (i--) {
+    points[i] = oPoints[i].pos||oPoints[i];
+  }
+  for(var i in Polygon.prototype){
+    Object.defineProperty(points,i,{
+      enumerable: false,
+      value: Polygon.prototype[i].bind(points)
+    });
+  }
+  Object.defineProperty(points,"clean",{
+    enumerable: false,
+    value: false
+  });
+  return points;
+}
+
+Polygon.prototype.clone = function(){
+  var points = this.slice(0);
+  for(var i in Polygon.prototype){
+    Object.defineProperty(points,i,{
+      enumerable: false,
+      value:Polygon.prototype[i].bind(points)
+    });
+  }
+  return points;
+}
+
+Polygon.prototype.forThree = function(fn,skip){
+  var l = this.length;
+  if(!this.clean){
+    for(var i=skip||0;i<l;i++){
+      var prev = (i+l-1)%l;//((i == 0)?l:i) -1
+      var curr = i;
+      var next = (i+1)%l; //i == l-1?0:i+1
+      this[prev] = this[prev].pos||this[prev];
+      this[curr] = this[curr].pos||this[curr];
+      this[next] = this[next].pos||this[next];
+      fn.call(this,this[prev],this[curr],this[next], curr);
+    }
+    this.clean = true;
+  }else{
+    for(var i=skip||0;i<l;i++){
+      var prev = (i+l-1)%l;//((i == 0)?l:i) -1
+      var curr = i;
+      var next = (i+1)%l; //i == l-1?0:i+1
+      fn.call(this,this[prev],this[curr],this[next], curr);
+    }
+  }
+}
+
+var cachable = require("./cachable");
+for(var i in cachable){
+  Polygon.prototype[i] = cachable[i]
+}
+var intersects = require("./intersects");
+for(var i in intersects){
+  Polygon.prototype[i] = intersects[i]
+}
+
+module.exports = Polygon;
+
+},{"./cachable":19,"./intersects":20}],18:[function(require,module,exports){
+var Vec2 = require("../Vec2");
+
+
+function Line(A,B){
+  if(A.equals(B))
+    throw new Error("cannot construct line when A == B");
+  this.angledSlope = A.clone().sub(B).normalize();
+  this.slope = this.angledSlope.scale(
+    Math.sign(this.angledSlope.x)||Math.sign(this.angledSlope.y)
+  );
+  this.inv_slope = (this.slope.y == 0)?false:this.slope.x/this.slope.y;
+  this.true_slope = (this.slope.x == 0)?false:this.slope.y/this.slope.x;
+  this.yint = (this.true_slope !== false)?-this.true_slope*A.x + A.y:false;
+  this.xint = (this.inv_slope !== false)?-this.inv_slope*A.y + A.x:false;
+
+  this.A = A;
+  this.B = B;
+  this.mid = A.clone().mid(B);
+  this.length2 = A.dist2(B);
+  this.length = Math.sqrt(this.length2);
+  this.cross = A.cross(B);
+}
+
+Line.prototype.toString = function(){
+  return "limits:["+A+","+B+"]," +
+  "intercepts:("+this.yint+","+thisxint+")";
+  "slope:("+this.slope+"), ";
+}
+
+Line.prototype.opposite = function(){
+  return this.B.y - this.A.y;
+}
+
+Line.prototype.adjacent = function(){
+  return this.B.x - this.A.x;
+}
+
+Line.prototype.perpendicularBisector = function(){
+  var mid = this.mid;
+  var A = this.A.clone().sub(mid).swap();
+  var B = A.clone();
+  A.y *= -1
+  B.x *= -1;
+  A.add(mid);
+  B.add(mid);
+  return new Line(A,B);
+}
+
+var interesctions = require("./intersections.js");
+
+for(var i in interesctions){
+  Line.prototype[i] = interesctions[i];
+}
+var eq = require("./equals.js");
+
+for(var i in eq){
+  Line.prototype[i] = eq[i];
+}
+
+module.exports = Line;
+
+},{"../Vec2":7,"./equals.js":22,"./intersections.js":21}],16:[function(require,module,exports){
+var Vec2 = require("../Vec2");
+var Line = require("../Line");
+var Circle = require("../Circle");
+
+
+function Triangle(A,B,C){
+  if(A.equals(B) || B.equals(C) || C.equals(A))
+    throw new Error("cannot create triangle when two points are the same")
+  this.A = A;
+  this.B = B;
+  this.C = C;
+  this.AB = new Line(A,B);
+  this.BC = new Line(B,C);
+  this.CA = new Line(C,A);
+  this.ABC = Math.lawCos(this.CA.length, this.AB.length, this.BC.length);
+  this.BCA = Math.asin(Math.sin(this.ABC)*this.CA.length/this.AB.length);
+  this.CAB = Math.asin(Math.sin(this.ABC)*this.BC.length/this.AB.length);
+  this.perimiter = this.AB.length + this.BC.length + this.CA.length
+  this.partialArea = this.AB.cross + this.BC.cross + this.CA.cross
+  this.area = Math.abs(this.partialArea);
+}
+
+
+var interesctions = require("./intersections.js");
+
+for(var i in interesctions){
+  Triangle.prototype[i] = interesctions[i];
+}
+
+var questions = require("./questions.js");
+
+for(var i in questions){
+  Triangle.prototype[i] = questions[i];
+}
+
+var constructs = require("./construct.js");
+
+for(var i in constructs){
+  Triangle.prototype[i] = constructs[i];
+}
+
+
+module.exports = Triangle;
+
+},{"../Circle":26,"../Line":18,"../Vec2":7,"./construct.js":25,"./intersections.js":23,"./questions.js":24}],23:[function(require,module,exports){
+var Triangle = {};
+
+Triangle.hasPoint = function(point){
+  //http://www.blackpawn.com/texts/pointinpoly/
+  // Compute vectors
+  var v0 = this.C.clone().sub(this.B);
+  var v1 = this.A.clone().sub(this.B);
+  var v2 = point.clone().sub(this.B);
+
+  // Compute dot products
+  var dot00 = v0.dot(v0);
+  var dot01 = v0.dot(v1);
+  var dot02 = v0.dot(v2);
+  var dot11 = v1.dot(v1);
+  var dot12 = v1.dot(v2);
+
+  // Compute barycentric coordinates
+  var invDenom = 1 / (dot00 * dot11 - dot01 * dot01)
+  var u = (dot11 * dot02 - dot01 * dot12) * invDenom
+  var v = (dot00 * dot12 - dot01 * dot02) * invDenom
+
+  // Check if point is in triangle
+  return (u >= 0) && (v >= 0) && (u + v < 1)
+}
+
+module.exports = Triangle;
+
+},{}],24:[function(require,module,exports){
+
+var Triangle = {};
+
+var sqrt2 = Math.pow(2,1/2);
+
+Triangle.isConcave = function(a,b,c){
+  //rotate the points around B to make B and A parrallel to the X axis
+  //If the line BC is negative, it is Concave
+  //If the line BC is positive, it is Convex
+  var ac = new Line(a,c);
+  //  A should always be rotated -PI/2
+  return ac.pointIsLeftOrTop(ac.perpendicularBisector().A)
+    == ac.pointIsLeftOrTop(b);
+  // return Math.sign(p.x) == Math.sign(b.x) && Math.sign(p.y) == Math.sign(b.y);
+}
+
+Triangle.anglePrimer = function(){
+  return this.CA.length - sqrt2*(this.AB.length+this.BC.length)/2;
+}
+
+Triangle.isAcute = function(){
+  return this.anglePrimer() < 0;
+}
+
+Triangle.isObtuse = function(){
+  return this.anglePrimer() > 0;
+}
+
+Triangle.isRight = function(){
+  return this.anglePrimer() == 0;
+}
+
+Triangle.equals = function(tri){
+  return this.A.equals(tri.A)
+  && this.B.equals(tri.B)
+  && this.C.equals(tri.C);
+}
+
+Triangle.epsilonEquals = function(tri, epsilon) {
+  return this.A.epsilonEquals(tri.A,epsilon)
+  && this.B.epsilonEquals(tri.B,epsilon)
+  && this.C.epsilonEquals(tri.C,epsilon);
+}
+
+Triangle.equalShape = function(tri) {
+  return this.area == tri.area && this.perimiter == tri.perimiter
+}
+
+Triangle.epsilonEqualShape = function(tri,epsilon) {
+  return Math.abs(this.area - tri.area)/27 <= epsilon
+  && Math.abs(this.perimiter - tri.perimiter)/9 <= epsilon;
+}
+
+Triangle.equalAngles = function(tri) {
+  var keys = ["ABC","BCA", "CAB"];
+  var i = 3;
+  var j;
+  while(i--){
+    j = 3;
+    while(j--){
+      if(this[keys[i]] == tri[keys[i]]) break;
+    }
+    if(j < 0) return false;
+  }
+  return true;
+}
+
+
+module.exports = Triangle;
+
+},{}],22:[function(require,module,exports){
+var Line = {};
+
+Line.equals = function(line){
+  return this.A.equals(line.A)
+  && this.B.equals(line.B);
+}
+
+Line.epsilonEquals = function(line, epsilon) {
+  return this.A.epsilonEquals(line.A,epsilon)
+  && this.B.epsilonEquals(line.B,epsilon);
+}
+
+Line.equalSlope = function(line) {
+  return this.slope.equals(line.slope)
+  && (this.xint)?this.xint == line.xint
+  :this.yint == line.yint;
+}
+
+Line.epsilonEqualSlope = function(line, epsilon) {
+  return this.slope.epsilonEquals(line.slope,epsilon)
+  && (this.xint)?Math.abs(this.xint - line.xint) <= epsilon
+  :Math.abs(this.yint - line.yint) <= epsilon
+}
+
+Line.equalMagnitude = function(line) {
+  return this.slope.equals(line.slope)
+  && this.length == line.length
+}
+
+Line.epsilonEqualMagnitude = function(line, epsilon) {
+  return this.slope.epsilonEquals(line.slope,epsilon)
+  && Math.abs(this.length - line.length) <= epsilon
+}
+
+
+module.exports =  Line;
+
+},{}],21:[function(require,module,exports){
+var Vec2 = require("../Vec2");
+var Line = {};
+
+Line.intersectsLine = function(lineB){
+  var lineA = this;
+  if(lineA.slope.equals(lineB.slope)) return false;
+
+  var intersect = new Vec2();
+  //lineA should take care of any special conditions
+  if(lineA.slope.x === 0 || lineB.slope.x === 0){
+    if(lineA.slope.y === 0 || lineB.slope.y === 0){
+      return new Vec2(
+        (lineA.slope.x === 0)?lineA.xint:lineB.xint,
+        (lineA.slope.y === 0)?lineA.yint:lineB.yint
+      );
+    }
+    //I don't care which one is which 0
+    //calculate in respect to X
+    intersect.y = (lineA.xint-lineB.xint)/(lineB.inv_slope-lineA.inv_slope);
+    intersect.x = lineA.inv_slope*intersect.y + lineA.xint;
+  }else{
+    intersect.x = (lineA.yint-lineB.yint)/(lineB.true_slope-lineA.true_slope);
+    intersect.y = lineA.true_slope*intersect.x + lineA.yint;
+  }
+  return intersect;
+}
+
+Line.pointIsLeftOrTop = function(p){
+  return this.slope.cross(p) > 0;
+};
+
+Line.intersectsPoint = function(p){
+  if(!this.slope.x) return this.xint == p.x;
+  return p.y == p.x*this.slope.slope() + this.yint;
+};
+
+module.exports = Line;
+
+},{"../Vec2":7}],25:[function(require,module,exports){
+
+var Circle = require("../Circle");
+var Triangle = {};
+
+Triangle.getInsideCircle = function(a,b,c){
+  return Circle.construct3(this.BC.mid,this.CA.mid,this.AB.mid);
+}
+Triangle.getOutsideCircle = function(){
+  return Circle.construct3(this.A,this.B,this.C);
+}
+Triangle.getConcaveBisector = function(){
+  return this.CA.perpendicularBisector();
+}
+module.exports = Triangle;
+/*
+Triangle.getCircumCircle = function(tri){
   var x1 = a.x,
   y1 = a.y,
   x2 = b.x,
@@ -1036,7 +1773,7 @@ Triangle.getCircumCircle = function(a,b,c){
   fabsy1y2 = Math.abs(y1 - y2),
   fabsy2y3 = Math.abs(y2 - y3),
   xc, yc, m1, m2, mx1, mx2, my1, my2, dx, dy;
-  /* Check for coincident points */
+  // Check for coincident points
   if(fabsy1y2 < EPSILON && fabsy2y3 < EPSILON){
     throw new Error("Eek! Coincident points!");
   }
@@ -1070,363 +1807,34 @@ Triangle.getCircumCircle = function(a,b,c){
   dy = y2 - yc;
   return new Circle(new Vec2(xc,yc),dx * dx + dy * dy);
 }
+*/
 
-Triangle.hasPoint = function(a,b,c,point){
-  //http://www.blackpawn.com/texts/pointinpoly/
-  // Compute vectors
-  var v0 = c.clone().sub(b);
-  var v1 = a.clone().sub(b);
-  var v2 = point.clone().sub(b);
+},{"../Circle":26}],20:[function(require,module,exports){
+var AABB = require("../AABB")
+var Line = require("../Line");
+var Polygon = {};
 
-  // Compute dot products
-  var dot00 = v0.dot(v0);
-  var dot01 = v0.dot(v1);
-  var dot02 = v0.dot(v2);
-  var dot11 = v1.dot(v1);
-  var dot12 = v1.dot(v2);
-
-  // Compute barycentric coordinates
-  var invDenom = 1 / (dot00 * dot11 - dot01 * dot01)
-  var u = (dot11 * dot02 - dot01 * dot12) * invDenom
-  var v = (dot00 * dot12 - dot01 * dot02) * invDenom
-
-  // Check if point is in triangle
-  return (u >= 0) && (v >= 0) && (u + v < 1)
-}
-
-Triangle.isConcave = function(a,b,c){
-  //rotate the points around B to make B and A parrallel to the X axis
-  //If the line BC is negative, it is Concave
-  //If the line BC is positive, it is Convex
-
-  var BAhyp = a.dist(b);
-  var BAopp = a.y - b.y;
-
-  var BArotate = Math.asin(BAopp/BAhyp);
-  var Cnew = c.rotate(c,-BArotate);
-
-  BCadj = Cnew.x - b.x;
-  BCopp = Cnew.y - b.y;
-  return BCopp < 0;
-}
-
-module.exports = Triangle;
-
-},{"./Circle":16,"./Vec2":6}],15:[function(require,module,exports){
-var Vec2 = require("./Vec2");
-
-function AABB (){
-  this.max = new Vec2(-Number.Infinity, -Number.Infinity);
-  this.min = new Vec2(Number.Infinity,Number.Infinity);
-}
-
-AABB.prototype.digestPoint = function(point){
-  this.max = this.max.max(point);
-  this.min = this.min.min(point);
-}
-
-
-module.exports = AABB;
-
-},{"./Vec2":6}],16:[function(require,module,exports){
-var Vec2 = require("./Vec2");
-
-function Circle(midpoint, radius){
-  var args;
-  if(typeof radius == "number"){
-    this.radius = radius;
-    this.midpoint = Vec2.overloaded(midpoint);
-    return;
-  }
-  args = Vec2.overloadArguments(
-    arguments,
-    Circle.lengthTest
-  );
-  if(args.length == 2){
-    this.midpoint = args[0].clone().add(args[1]).scale(1/2);
-    this.radius = args[0].dist(args[1])/2;
-  }else if(args.length == 3){
-  }else{
-    throw new Error("can only construct a Circle from 2 or 3 points or midpoint and radius");
-  }
-
-}
-
-Circle.prototype.containsPoint = function(point){
-  return this.midpoint.dist(point.pos) < radius;
-}
-
-Circle.prototype.hasPoint = function(){
-  return this.midpoint.dist(point.pos) == radius;
-}
-
-Circle.prototype.getLineIntersection = function(line){
-  //http://mathworld.wolfram.com/Circle-LineIntersection.html
-  var lx = -line.xint.x;
-  var ly = line.yint.y;
-  var lr = Math.sqrt(ly*ly + lx+lx);
-  cr = line.xint.cross(line.yint); //line.xint.x*line.yint.y + 0*0
-
-  var r = this.radius
-
-  var delta = r*r*dr*dr - cr*cr;
-  // no intersection
-  if(delta < 0) return false;
-  lr = lr*lr; //reduce calculations
-  // tangent line
-  if(delta == 0) return [new Vec2( cr*ly/lr, -cr*lx/lr )];
-  //reduce calculations
-  delta = Math.sqrt(delta);
-  var crly = cr*ly;
-  var crlx = -cr*lx;
-  var sigdel = Math.sig(ly)*lx * delta;
-  var absdel = Math.abs(ly) * delta;
-  return [
-    new Vec2( (crly + sigdel) / lr, (crlx + absdel) / lr),
-    new Vec2( (crly - sigdel) / lr, (crlx - absdel) / lr)
-  ];
-}
-
-Circle.constructFrom2points = function(A,B){
-  var midpoint = A.clone().add(B).scale(1/2);
-  var radius = A.dist(B)/2;
-  return new Circle(midpoint, radius);
-}
-
-Circle.constructFrom3points = function(A,B,C){
-  var pbAB = (new Line(A, B)).getPerpendicularBisect();
-  var pbCB = (new Line(C, B)).getPerpendicularBisect();
-  var midpoint = pbAB.getIntersection(pbCB);
-  var radius = A.dist(midpoint);
-  return new Circle(midpoint, radius);
-}
-
-
-Circle.lengthTest = function(length){
-  return (length == 2 || length == 3)?length:false;
-}
-
-module.exports = Circle;
-
-},{"./Vec2":6}],17:[function(require,module,exports){
-var Vec2 = require("./Vec2");
-
-
-function Line(slope,intercept,boo){
-  if(typeof arguments[0] == "number" && typeof arguments[1] == "number"){
-    if(boo){
-      this.inv_slope = slope;
-      this.xint = intercept
-      this.true_slope = 1/this.inv_slope;
-      this.yint = -this.true_slope*this.xint;
-    }else{
-      this.true_slope = slope;
-      this.yint = intercept
-      this.inv_slope = 1/this.true_slope;
-      this.xint = -this.inv_slope*this.yint;
-    }
-    this.limits = [new Vec2(0,yint),new Vec2(0,xint)];
-    this.slope = this.limits[0].clone().sub(this.limits[1]);
-    return;
-  }
-  var args = Vec2.overloadArguments(
-    arguments,
-    Line.lengthTest
-  );
-  if(args[0].equals(args[1])){
-    throw new Error("Cannot create a line from equivalent values");
-  }
-
-  this.limits = [args[0], args[1]];
-  this.mid = args[0].clone().add(args[1]).scale(1/2);
-  this.slope = args[0].clone().sub(args[1]);
-  this.inv_slope = (this.slope.y == 0)?false:this.slope.x/this.slope.y;
-  this.true_slope = (this.slope.x == 0)?false:this.slope.y/this.slope.x;
-  this.yint = -this.true_slope*args[0].x + args[0].y
-  this.xint = -this.inv_slope*args[0].y + args[0].x
-}
-
-Line.prototype.length = function(){
-  return this.limits[0].dist(this.limits[1]);
-}
-
-Line.prototype.getPerpendicularBisect = function(){
-  var yint = -this.inv_slope*mid.x + mid.y;
-  return new Line(this.inv_slope, yint);
-}
-
-Line.prototype.opposite = function(){
-  return this.limits[1].y - this.limits[0].y;
-}
-
-Line.prototype.adjacent = function(){
-  return this.limits[1].x - this.limits[0].x;
-}
-
-
-Line.prototype.getIntersection = function(B1,B2){
-
-  var lineB = (B1 instanceof Line)?B1:new Line(B1,B2);
-
-  // unlikely
-  if(this.slope.equals(lineB.slope)) return false;
-
-  var intersect = new Vec2();
-  //This should take care of any special conditions
-  if(this.slope.x === 0 || lineB.slope.x === 0){
-    if(this.slope.x == lineB.slope.x) return false;
-    if(this.slope.y === 0 || lineB.slope.y === 0){
-      return new Vec2(
-        (this.slope.x === 0)?this.xint:lineB.xint,
-        (this.slope.y === 0)?this.yint:lineB.yint
-      );
-    }
-
-    //I don't care which one is which
-    var true_slope_A = this.inv_slope;
-    var true_slope_B = lineB.inv_slope;
-    //calculate in respect to X
-    var bA = this.xint;
-    var bB = lineB.xint;
-    intersect.y = (bA-bB)/(true_slope_B-true_slope_A);
-    intersect.x = true_slope_A*intersect.y + bA;
-  }else{
-    var true_slope_A = this.true_slope;
-    var true_slope_B = lineB.true_slope;
-    if(true_slope_A == true_slope_B) return false;
-    var bA = this.yint;
-    var bB = lineB.yint;
-    intersect.x = (bA-bB)/(true_slope_B-true_slope_A);
-    intersect.y = true_slope_A*intersect.x + bA;
-  }
-  return intersect;
-
-}
-
-Line.lengthTest = function(length){
-  return (length == 2)?2:false;
-}
-
-Line.getIntersection = function(A1,A2,B1,B2){
-  var slopeA = A1.clone().sub(A2);
-  var slopeB = B1.clone().sub(B2);
-
-  // unlikely
-  if(slopeA.equals(slopeB)) return false;
-
-  var intersect = new Vec2();
-  //This should take care of any special conditions
-  if(slopeA.x == 0 || slopeB.x == 0){
-    if(slopeA.x == slopeB.x) return false;
-    if(slopeA.y == 0 || slopeB.y == 0){
-      return new Vec2(
-        (slopeA.x == 0)?A1.x:B1.x,
-        (slopeA.y == 0)?A1.y:B1.y
-      );
-    }
-
-    //I don't care which one is which
-    var true_slope_A = slopeA.x/slopeA.y;
-    var true_slope_B = slopeB.x/slopeB.y;
-    //calculate in respect to X
-    var bA = -true_slope_A*A1.y + A1.x;
-    var bB = -true_slope_B*B1.y + B1.x;
-    intersect.y = (bA-bB)/(true_slope_B-true_slope_A);
-    intersect.x = true_slope_A*intersect.y + bA;
-  }else{
-    var true_slope_A = slopeA.y/slopeA.x;
-    var true_slope_B = slopeB.y/slopeB.x;
-    if(true_slope_A == true_slope_B) return false;
-    var bA = -true_slope_A*A1.x + A1.y;
-    var bB = -true_slope_B*B1.x + B1.y;
-    intersect.x = (bA-bB)/(true_slope_B-true_slope_A);
-    intersect.y = true_slope_A*intersect.x + bA;
-  }
-  return intersect;
-
-}
-
-module.exports = Line;
-
-},{"./Vec2":6}],14:[function(require,module,exports){
-
-var Vec2 = require("./Vec2");
-var Line = require("./Line");
-var Circle = require("./Circle");
-var Delaney = require("delaunay-fast")
-
-function Polygon(points){
-  if(arguments.length == 0){
-    points = [];
-  }
-  if(points instanceof Polygon)
-    return points;
-  points = Vec2.overloadArguments(
-    arguments,
-    Polygon.lengthTest
-  );
-  for(var i in Polygon.prototype){
-    Object.defineProperty(points,i,{
-      enumerable: false,
-      value:Polygon.prototype[i].bind(points)
-    });
-  }
-  return points;
-}
-
-Polygon.prototype.clone = function(){
-  var points = this.slice(0);
-  for(var i in Polygon.prototype){
-    Object.defineProperty(points,i,{
-      enumerable: false,
-      value:Polygon.prototype[i].bind(points)
-    });
-  }
-  return points;
-}
-
-
-Polygon.prototype.forThree = function(fn,skip){
-  var l = this.length;
-  for(var i=skip||0;i<l;i++){
-    var prev = (i+l-1)%l;//((i == 0)?l:i) -1
-    var curr = i;
-    var next = (i+1)%l; //i == l-1?0:i+1
-    fn.call(this,this[prev],this[curr],this[next], curr);
-  }
-}
-
-Polygon.prototype.getIntersects = function(tprev,tcurr,skip){
+Polygon.intersectsLine = function(line,skip){
   //creating smaller aabbs
   //We're going to detect intersection by slope
   //however, the point of intersection may be outside of the of the possible area
   //as a result we're creating a smaller aabb thats the maxes and minimums of the current area
 
-  var tAABB = {
-    max: tprev.max(tcurr),
-    min: tprev.min(tcurr)
-  };
-  var tAB_line = new Line(tprev,tcurr);
+  var tAABB = new AABB(line.A,line.B);
 
   var intersections = [];
 
   this.forThree(function(oprev,ocurr,onext){
-    if(tcurr == ocurr) return;
-    if(tcurr == oprev) return;
-    if(oprev == tcurr) return;
-    var oAABB = {
-      max: oprev.max(ocurr),
-      min: oprev.min(ocurr)
-    };
+    if(line.A == ocurr) return;
+    if(line.B == oprev) return;
+    if(oprev == line.A) return;
+    var oAABB = new AABB(oprev,ocurr);
 
-    if(tAABB.min.x >= oAABB.max.x) return;
-    if(tAABB.min.y >= oAABB.max.y) return;
-    if(oAABB.min.x >= tAABB.max.x) return;
-    if(oAABB.min.y >= tAABB.max.y) return;
+    if(!tAABB.intersectsAABB(oAABB)) return;
 
     //I would like to cache the oprev->ocurr line if possible
     //I would also prefer searching only for lines with the appropiate AABBs
-    var intersect = tAB_line.getIntersection(oprev,ocurr);
+    var intersect = line.intersectsLine(new Line(oprev,ocurr));
     if(!intersect) return;
 
     var netAABB = {
@@ -1434,19 +1842,180 @@ Polygon.prototype.getIntersects = function(tprev,tcurr,skip){
       min: oAABB.min.max(tAABB.min)
     };
     //If intersect point isn't between the two points, this isn't for us.
-    if(intersect.x >= netAABB.max.x) return;
-    if(intersect.y >= netAABB.max.y) return;
-    if(intersect.x <= netAABB.min.x) return;
-    if(intersect.y <= netAABB.min.y) return;
+    if(!tAABB.containsPoint(intersect)) return;
 
     intersections.push(intersect);
 
   },skip);
-
   return intersections;
 }
+module.exports = Polygon;
 
-Polygon.prototype.getMidPoint = function(){
+},{"../AABB":15,"../Line":18}],26:[function(require,module,exports){
+
+var Vec2 = require("../Vec2");
+var Line = require("../Line");
+function Circle(midpoint, radius){
+  /*
+  Error checks slow things down;
+  if(typeof radius != "number") throw new Error("radius needs to be a number");
+  if(radius <= 0) throw new Error("radius needs to be greater than 0");
+  if(!(midpoint instanceof Vec2)) throw new Error("midpoint needs to be a Vec2");
+  */
+  this.radius = radius;
+  this.midpoint = midpoint;
+}
+
+Circle.construct2 = function(A,B){
+  var midpoint = A.clone().add(B).scale(1/2);
+  var radius = A.dist(B)/2;
+  return new Circle(midpoint,radius);
+}
+
+Circle.construct3 = function(A,B,C){
+  var pbAB = new Line(A, B)
+  pbAB = pbAB.perpendicularBisector();
+  var pbCB = (new Line(B, C))
+  pbCB = pbCB.perpendicularBisector();
+  var midpoint = pbAB.intersectsLine(pbCB);
+  var radius = A.dist(midpoint);
+    
+  return new Circle(midpoint,radius);
+}
+
+
+var intersections = require("./intersections.js");
+
+for(var i in intersections){
+  Circle.prototype[i] = intersections[i];
+}
+
+var questions = require("./questions.js");
+
+for(var i in questions){
+  Circle.prototype[i] = questions[i];
+}
+
+
+module.exports = Circle;
+
+},{"../Line":18,"../Vec2":7,"./intersections.js":27,"./questions.js":28}],28:[function(require,module,exports){
+var Circle = {};
+var Vec2 = require("../Vec2");
+Circle.equals = function(circle){
+  return this.midpoint.equals(circle.midpoint) && this.radius === circle.radius;
+}
+
+Circle.epsilonEquals = function(circle, epsilon) {
+  return this.midpoint.epsilonEquals(circle.midpoint,epsilon)
+  && Math.abs(this.radius - circle.radius) <= epsilon;
+}
+
+module.exports = Circle;
+
+},{"../Vec2":7}],27:[function(require,module,exports){
+var Line = require("../Line");
+var Vec2 = require("../Vec2");
+var Circle = {};
+
+Circle.intersectsCircle = function(circle){
+  //http://stackoverflow.com/questions/12219802/a-javascript-function-that-returns-the-x-y-points-of-intersection-between-two-ci
+  //because my custom code wouldn't produce correct results : /
+  console.log(this)
+  console.log(circle)
+  var c1r = this.radius;
+  var c2r = circle.radius;
+  //Calculate distance between centres of circle
+  var d =this.midpoint.dist(circle.midpoint);
+  var m = c1r + c2r;
+  var n = c1r - c2r;
+
+  if (n < 0) n = n * -1;
+  //No solns
+  if ( d > m )
+    return false;
+  //Circle are contained within each other
+  if ( d < n )
+    return false;
+  //Circles are the same
+  if ( d == 0 && c1r == c2r )
+    return true;
+  //Solve for a
+  var a = ( c1r * c1r - c2r * c2r + d * d ) / (2 * d);
+console.log(a);
+console.log(c2r);
+//Solve for h
+  var h = Math.sqrt( c1r * c1r - a * a );
+
+  var middiff = circle.midpoint.clone().sub(this.midpoint);
+  //Calculate point p, where the line through the circle intersection points crosses the line between the circle centers.
+  var p = this.midpoint.clone().scale(a/d).mul(middiff);
+
+  //1 soln , circles are touching
+  if ( d == c1r + c2r ) {
+    return [p];
+  }
+  middiff.swap().scale(h/d);
+  //2solns
+  var p1 = p.clone().add(new Vec2(1,-1).mul(middiff));
+  var p2 = p.clone().add(new Vec2(-1,1).mul(middiff));;
+
+  return [p1,p2];
+}
+
+Circle.intersectsLine = function(line){
+  /*
+    x2−2x*m.x+m.x2+y2-2y*m.y+m.y2 - r2
+    -  mx + b - y
+    = intersects
+  */
+  var midpoint = this.midpoint;
+  var r = this.radius;
+  //http://mathworld.wolfram.com/Circle-LineIntersection.html
+  var t1 = line.A.clone().sub(midpoint);
+  var t2 = line.B.clone().sub(midpoint);
+  var t =  t1.clone().sub(t2);
+  var lr = t.length2();
+  var cr = t1.cross(t2);
+  var lx = t.x;
+  var ly = t.y;
+
+  var delta = r*r*lr - cr*cr;
+  // no intersection
+  if(delta < 0) return false;
+  // tangent line
+  if(delta == 0) return [new Vec2( cr*ly/lr, cr*lx/lr ).add(midpoint)];
+  //reduce calculations
+  delta = Math.sqrt(delta);
+  var crly = cr*ly;
+  var crlx = -cr*lx;
+  var sigdel = Math.sign(ly)*lx * delta;
+  var absdel = Math.abs(ly) * delta;
+  return [
+      new Vec2( (crly + sigdel) / lr, (crlx + absdel) / lr).add(midpoint),
+    new Vec2( (crly - sigdel) / lr, (crlx - absdel) / lr).add(midpoint)
+  ];
+}
+
+Circle.containsPoint = function(point){
+  return this.midpoint.dist(point) < this.radius;
+}
+
+Circle.intersectsPoint = function(point){
+  return this.midpoint.dist(point) == this.radius;
+}
+
+
+module.exports = Circle;
+
+},{"../Line":18,"../Vec2":7}],19:[function(require,module,exports){
+var Vec2 = require("../Vec2");
+var Delaney = require("delaunay-fast")
+
+
+var Polygon = {};
+
+Polygon.getMidPoint = function(){
   var l = this.length;
   var mid = new Vec2();
   for(var i=this.length;i--;){
@@ -1455,7 +2024,7 @@ Polygon.prototype.getMidPoint = function(){
   return mid;
 }
 
-Polygon.prototype.getArea = function(){
+Polygon.getArea = function(){
   var net = 0;
   //http://www.wikihow.com/Calculate-the-Area-of-a-Polygon
   this.forThree(function(a,b,c){
@@ -1464,28 +2033,22 @@ Polygon.prototype.getArea = function(){
   return net;
 }
 
-Polygon.prototype.getAABB = function(){
-  var max = new Vec2(-Number.Infinity,-Number.Infinity);
-  var min = new Vec2(Number.Infinity,Number.Infinity);
+Polygon.getAABB = function(){
+  var max = new Vec2(Number.NEGATIVE_INFINITY,Number.NEGATIVE_INFINITY);
+  var min = new Vec2(Number.POSITIVE_INFINITY,Number.POSITIVE_INFINITY);
   for(var i=this.length;i--;){
-    max = max.max(this[i]);
-    min = min.min(this[i]);
+    max.max(this[i]);
+    min.min(this[i]);
   }
   return {max:max,min:min};
 }
 
-Polygon.prototype.getDelaney = function(){
+Polygon.getDelaney = function(){
   return Delaney.triangulate(this,"asArray");
 }
+module.exports = Polygon
 
-
-Polygon.lengthTest = function(length){
-  return (length>3)?length:false;
-}
-
-module.exports = Polygon;
-
-},{"./Circle":16,"./Line":17,"./Vec2":6,"delaunay-fast":18}],18:[function(require,module,exports){
+},{"../Vec2":7,"delaunay-fast":29}],29:[function(require,module,exports){
 var Delaunay;
 
 (function() {
