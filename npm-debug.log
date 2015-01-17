@@ -1,33 +1,23 @@
 0 info it worked if it ends with ok
-1 verbose cli [ '/usr/local/bin/node',
-1 verbose cli   '/usr/local/bin/npm',
-1 verbose cli   'run',
-1 verbose cli   'watch-build-test' ]
-2 info using npm@1.4.28
+1 verbose cli [ 'node', '/usr/local/bin/npm', 'run', 'watch-buid-test' ]
+2 info using npm@2.1.18
 3 info using node@v0.10.35
-4 verbose run-script [ 'prewatch-build-test',
-4 verbose run-script   'watch-build-test',
-4 verbose run-script   'postwatch-build-test' ]
-5 info prewatch-build-test verlet@1.0.0
-6 info watch-build-test verlet@1.0.0
-7 verbose unsafe-perm in lifecycle true
-8 info verlet@1.0.0 Failed to exec watch-build-test script
-9 error verlet@1.0.0 watch-build-test: `VERLET_WATCH=true
-9 error VERLET_TEST=true node build.js`
-9 error Exit status 8
-10 error Failed at the verlet@1.0.0 watch-build-test script.
-10 error This is most likely a problem with the verlet package,
-10 error not with npm itself.
-10 error Tell the author that this fails on your system:
-10 error     VERLET_WATCH=true
-10 error VERLET_TEST=true node build.js
-10 error You can get their info via:
-10 error     npm owner ls verlet
-10 error There is likely additional logging output above.
-11 error System Linux 3.13.0-40-generic
-12 error command "/usr/local/bin/node" "/usr/local/bin/npm" "run" "watch-build-test"
-13 error cwd /home/sam/Programming/html5_apps/verlet_physics_collision/verlet-js
-14 error node -v v0.10.35
-15 error npm -v 1.4.28
-16 error code ELIFECYCLE
-17 verbose exit [ 1, true ]
+4 verbose stack Error: missing script: watch-buid-test
+4 verbose stack     at run (/usr/local/lib/node_modules/npm/lib/run-script.js:130:19)
+4 verbose stack     at /usr/local/lib/node_modules/npm/lib/run-script.js:81:5
+4 verbose stack     at /usr/local/lib/node_modules/npm/node_modules/read-package-json/read-json.js:51:40
+4 verbose stack     at final (/usr/local/lib/node_modules/npm/node_modules/read-package-json/read-json.js:349:17)
+4 verbose stack     at then (/usr/local/lib/node_modules/npm/node_modules/read-package-json/read-json.js:126:33)
+4 verbose stack     at /usr/local/lib/node_modules/npm/node_modules/read-package-json/read-json.js:266:40
+4 verbose stack     at evalmachine.<anonymous>:272:14
+4 verbose stack     at /usr/local/lib/node_modules/npm/node_modules/graceful-fs/graceful-fs.js:102:5
+4 verbose stack     at Object.oncomplete (evalmachine.<anonymous>:108:15)
+5 verbose cwd /home/sam/Programming/html5_apps/verlet_physics_collision/verlet-js
+6 error Linux 3.13.0-44-generic
+7 error argv "node" "/usr/local/bin/npm" "run" "watch-buid-test"
+8 error node v0.10.35
+9 error npm  v2.1.18
+10 error missing script: watch-buid-test
+11 error If you need help, you may report this error at:
+11 error     <http://github.com/npm/npm/issues>
+12 verbose exit [ 1, true ]

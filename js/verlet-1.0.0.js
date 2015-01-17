@@ -1761,6 +1761,8 @@ function Circle(midpoint, radius){
   */
   this.radius = radius;
   this.midpoint = midpoint;
+  this.quadraticX = [1,2*-midpoint.x,midpoint.x*midpoint.x]
+  this.quadraticY = [1,2*-midpoint.y,midpoint.y*midpoint.y]
 }
 
 Circle.construct2 = function(A,B){
@@ -1776,7 +1778,7 @@ Circle.construct3 = function(A,B,C){
   pbCB = pbCB.perpendicularBisector();
   var midpoint = pbAB.intersectsLine(pbCB);
   var radius = A.dist(midpoint);
-    
+
   return new Circle(midpoint,radius);
 }
 
@@ -1816,48 +1818,74 @@ var Vec2 = require("../Vec2");
 var Circle = {};
 
 Circle.intersectsCircle = function(circle){
-  //http://stackoverflow.com/questions/12219802/a-javascript-function-that-returns-the-x-y-points-of-intersection-between-two-ci
-  //because my custom code wouldn't produce correct results : /
-  console.log(this)
-  console.log(circle)
-  var c1r = this.radius;
-  var c2r = circle.radius;
-  //Calculate distance between centres of circle
-  var d =this.midpoint.dist(circle.midpoint);
-  var m = c1r + c2r;
-  var n = c1r - c2r;
+  //http://www.mathportal.org/calculators/polynomials-solvers/polynomials-expanding-calculator.php
 
-  if (n < 0) n = n * -1;
-  //No solns
-  if ( d > m )
-    return false;
-  //Circle are contained within each other
-  if ( d < n )
-    return false;
-  //Circles are the same
-  if ( d == 0 && c1r == c2r )
-    return true;
-  //Solve for a
-  var a = ( c1r * c1r - c2r * c2r + d * d ) / (2 * d);
-console.log(a);
-console.log(c2r);
-//Solve for h
-  var h = Math.sqrt( c1r * c1r - a * a );
+  var xb = this.quadraticX[1] - circle.quadraticX[1];
+  var xc = this.quadraticX[2] - circle.quadraticX[2];
 
-  var middiff = circle.midpoint.clone().sub(this.midpoint);
-  //Calculate point p, where the line through the circle intersection points crosses the line between the circle centers.
-  var p = this.midpoint.clone().scale(a/d).mul(middiff);
+  var yb = this.quadraticY[1] - circle.quadraticY[1];
+  var yc = this.quadraticY[2] - circle.quadraticY[2];
 
-  //1 soln , circles are touching
-  if ( d == c1r + c2r ) {
-    return [p];
+  var rd = -this.radius*this.radius + circle.radius*circle.radius;
+  var offset = xc + yc + rd;
+
+  var fa;
+  var fb;
+  var fc;
+  if(yb == 0 && xb == 0) return true;
+  if(yb == 0){ // need to solve for X
+    console.log("no y");
+    var x = -offset/xb;
+    //expanded = yb^2 * y^2 / xb^2 + 2*yb*y*offset/xb^2  + offset^2/yb^2
+    var xb2 = xb*xb;
+
+    fa = 1; //+ yb*yb /xb2;
+    fb = this.quadraticY[1]; //+ 2*yb*offset /xb2;
+    fc = this.quadraticY[2] + Math.pow(x - this.midpoint.x, 2);
+    var cords = Math.quadratic(fa,fb,fc);
+    if(!cords) return false;
+    var l = cords.length;
+    //x = -(y*yb + offset)/xb
+    //(-x*xb - offset)/yb = y
+    while(l--){
+      cords[l] = new Vec2(x, cords[l]);
+    }
+    return cords;
+  }else if(xb == 0){ // need to solve for Y
+    console.log("no x");
+    var y = -offset/yb;
+    //expanded = yb^2 * y^2 / xb^2 + 2*yb*y*offset/xb^2  + offset^2/yb^2
+    var yb2 = yb*yb;
+
+    fa = 1; //+ yb*yb /xb2;
+    fb = this.quadraticX[1]; //+ 2*yb*offset /xb2;
+    fc = this.quadraticX[2] + Math.pow(y - this.midpoint.y, 2);
+    var cords = Math.quadratic(fa,fb,fc);
+    if(!cords) return false;
+    var l = cords.length;
+    //x = -(y*yb + offset)/xb
+    //(-x*xb - offset)/yb = y
+    while(l--){
+      cords[l] = new Vec2(cords[l], y);
+    }
+    return cords;
   }
-  middiff.swap().scale(h/d);
-  //2solns
-  var p1 = p.clone().add(new Vec2(1,-1).mul(middiff));
-  var p2 = p.clone().add(new Vec2(-1,1).mul(middiff));;
-
-  return [p1,p2];
+  //will solve for Y
+  //equation = y = (-(x*xb + offset)/yb)^2
+  //expanded = xb^2 * x^2 / yb^2 + 2*xb*x*offset/yb^2  + offset^2/yb^2
+  var yb2 = yb*yb;
+  fa = 1 + (xb*xb /yb2);
+  fb = this.quadraticX[1] + 2*xb*offset /yb2;
+  fc = this.quadraticX[2] + offset*offset / yb2;
+  console.log(fa);
+  console.log(fb);
+  console.log(fc);
+  var cords = Math.quadratic(fa,fb,fc);
+  if(!cords) return false;
+  while(l--){
+    cords[l] = new Vec2(cords[l], -(cords[l]*xb+offset)/yb);
+  }
+  return cords;
 }
 
 Circle.intersectsLine = function(line){
