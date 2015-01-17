@@ -39,7 +39,6 @@ assert("2 intersects on line",
 );
 
 temp = (new Circle(new Vec2(2,2),3)).intersectsLine(new Line(new Vec2(0,-1),new Vec2(10,-1)));
-console.log(temp);
 assert("1 intersects on line", temp[0].equals(new Vec2(2,-1)) );
 
 temp = (new Circle(new Vec2(2,2),3)).intersectsLine(new Line(new Vec2(0,10),new Vec2(10,10)));
@@ -51,17 +50,23 @@ temp =
 .intersectsCircle(
   Circle.construct3(new Vec2(-3,-4),new Vec2(3,4),new Vec2(5,0))
 );
-console.log(temp);
 assert("2 intersects between circle",
-  (temp[0].equals(new Vec2(-3,4)) && temp[1].equals(new Vec2(3,4)))
-||(temp[1].equals(new Vec2(-3,4)) && temp[0].equals(new Vec2(3,4)))
+  temp
+  &&(
+    (   temp[0].epsilonEquals(new Vec2(-3,-4),0.00001)
+    &&  temp[1].epsilonEquals(new Vec2(3,4),0.00001))
+  ||
+    (   temp[1].epsilonEquals(new Vec2(-3,-4),0.00001)
+    &&  temp[0].epsilonEquals(new Vec2(3,4),0.00001))
+  )
 );
 
 temp =   Circle.construct2(new Vec2(0,0),new Vec2(2,2))
 .intersectsCircle(
   Circle.construct2(new Vec2(0,0),new Vec2(-3,-4))
 );
-assert("1 intersects between circle", temp[0].equals(new Vec2(0,0)) );
+console.log(temp);
+assert("1 intersects between circle", temp&&temp[0].epsilonEquals(new Vec2(0,0),0.1) );
 
 temp = (new Circle(new Vec2(2,0),1)).intersectsCircle(new Circle(new Vec2(-2,0),1));
 assert("0 intersects between circle", !temp );
