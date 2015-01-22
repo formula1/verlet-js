@@ -28,11 +28,7 @@
 	"bugs": {
 		"url": "https://github.com/subprotocol/verlet-js/issues"
 	},
-	"dependencies": {
-		"vec2": "~1.3.0",
-		"delaunay-fast": "latest"
-
-	},
+	"dependencies": {},
 	"devDependencies": {
 		"node-watch": "latest",
 		"async": "latest",

@@ -43,7 +43,7 @@ if(!Math.quadratic){
 if(!Math.lawCos){
   //x = (-b +- b*b - 4ac )/(2a)
   Math.lawCos = function(a,b,c){
-    Math.acos(
+    return Math.acos(
       (-a*a + b*b + c*c)/
       (2*b*c)
     );
@@ -1684,7 +1684,6 @@ module.exports = Line;
 },{"../Vec2":7,"./equals.js":23,"./intersections.js":22}],17:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = require("../Line");
-var Circle = require("../Circle");
 
 
 function Triangle(A,B,C){
@@ -1726,7 +1725,7 @@ for(var i in constructs){
 
 module.exports = Triangle;
 
-},{"../Circle":27,"../Line":19,"../Vec2":7,"./construct.js":26,"./intersections.js":24,"./questions.js":25}],24:[function(require,module,exports){
+},{"../Line":19,"../Vec2":7,"./construct.js":26,"./intersections.js":24,"./questions.js":25}],24:[function(require,module,exports){
 var Triangle = {};
 
 Triangle.hasPoint = function(point){
@@ -1825,6 +1824,61 @@ Triangle.equalAngles = function(tri) {
 
 module.exports = Triangle;
 
+},{}],26:[function(require,module,exports){
+
+var Triangle = {};
+
+Triangle.getConcaveBisector = function(){
+  return this.CA.perpendicularBisector();
+}
+module.exports = Triangle;
+/*
+Triangle.getCircumCircle = function(tri){
+  var x1 = a.x,
+  y1 = a.y,
+  x2 = b.x,
+  y2 = b.y,
+  x3 = c.x,
+  y3 = c.y,
+  fabsy1y2 = Math.abs(y1 - y2),
+  fabsy2y3 = Math.abs(y2 - y3),
+  xc, yc, m1, m2, mx1, mx2, my1, my2, dx, dy;
+  // Check for coincident points
+  if(fabsy1y2 < EPSILON && fabsy2y3 < EPSILON){
+    throw new Error("Eek! Coincident points!");
+  }
+  if(fabsy1y2 < EPSILON) {
+    m2 = -((x3 - x2) / (y3 - y2));
+    mx2 = (x2 + x3) / 2.0;
+    my2 = (y2 + y3) / 2.0;
+    xc = (x2 + x1) / 2.0;
+    yc = m2 * (xc - mx2) + my2;
+  }
+  else if(fabsy2y3 < EPSILON) {
+    m1 = -((x2 - x1) / (y2 - y1));
+    mx1 = (x1 + x2) / 2.0;
+    my1 = (y1 + y2) / 2.0;
+    xc = (x3 + x2) / 2.0;
+    yc = m1 * (xc - mx1) + my1;
+  }
+  else {
+    m1 = -((x2 - x1) / (y2 - y1));
+    m2 = -((x3 - x2) / (y3 - y2));
+    mx1 = (x1 + x2) / 2.0;
+    mx2 = (x2 + x3) / 2.0;
+    my1 = (y1 + y2) / 2.0;
+    my2 = (y2 + y3) / 2.0;
+    xc = (m1 * mx1 - m2 * mx2 + my2 - my1) / (m1 - m2);
+    yc = (fabsy1y2 > fabsy2y3) ?
+    m1 * (xc - mx1) + my1 :
+    m2 * (xc - mx2) + my2;
+  }
+  dx = x2 - xc;
+  dy = y2 - yc;
+  return new Circle(new Vec2(xc,yc),dx * dx + dy * dy);
+}
+*/
+
 },{}],23:[function(require,module,exports){
 var Line = {};
 
@@ -1918,69 +1972,7 @@ Line.intersectsPoint = function(p){
 
 module.exports = Line;
 
-},{"../Vec2":7}],26:[function(require,module,exports){
-
-var Circle = require("../Circle");
-var Triangle = {};
-
-Triangle.getInsideCircle = function(a,b,c){
-  return Circle.construct3(this.BC.mid,this.CA.mid,this.AB.mid);
-}
-Triangle.getOutsideCircle = function(){
-  return Circle.construct3(this.A,this.B,this.C);
-}
-Triangle.getConcaveBisector = function(){
-  return this.CA.perpendicularBisector();
-}
-module.exports = Triangle;
-/*
-Triangle.getCircumCircle = function(tri){
-  var x1 = a.x,
-  y1 = a.y,
-  x2 = b.x,
-  y2 = b.y,
-  x3 = c.x,
-  y3 = c.y,
-  fabsy1y2 = Math.abs(y1 - y2),
-  fabsy2y3 = Math.abs(y2 - y3),
-  xc, yc, m1, m2, mx1, mx2, my1, my2, dx, dy;
-  // Check for coincident points
-  if(fabsy1y2 < EPSILON && fabsy2y3 < EPSILON){
-    throw new Error("Eek! Coincident points!");
-  }
-  if(fabsy1y2 < EPSILON) {
-    m2 = -((x3 - x2) / (y3 - y2));
-    mx2 = (x2 + x3) / 2.0;
-    my2 = (y2 + y3) / 2.0;
-    xc = (x2 + x1) / 2.0;
-    yc = m2 * (xc - mx2) + my2;
-  }
-  else if(fabsy2y3 < EPSILON) {
-    m1 = -((x2 - x1) / (y2 - y1));
-    mx1 = (x1 + x2) / 2.0;
-    my1 = (y1 + y2) / 2.0;
-    xc = (x3 + x2) / 2.0;
-    yc = m1 * (xc - mx1) + my1;
-  }
-  else {
-    m1 = -((x2 - x1) / (y2 - y1));
-    m2 = -((x3 - x2) / (y3 - y2));
-    mx1 = (x1 + x2) / 2.0;
-    mx2 = (x2 + x3) / 2.0;
-    my1 = (y1 + y2) / 2.0;
-    my2 = (y2 + y3) / 2.0;
-    xc = (m1 * mx1 - m2 * mx2 + my2 - my1) / (m1 - m2);
-    yc = (fabsy1y2 > fabsy2y3) ?
-    m1 * (xc - mx1) + my1 :
-    m2 * (xc - mx2) + my2;
-  }
-  dx = x2 - xc;
-  dy = y2 - yc;
-  return new Circle(new Vec2(xc,yc),dx * dx + dy * dy);
-}
-*/
-
-},{"../Circle":27}],21:[function(require,module,exports){
+},{"../Vec2":7}],21:[function(require,module,exports){
 var AABB = require("../AABB")
 var Line = require("../Line");
 var Polygon = {};
@@ -2022,136 +2014,7 @@ Polygon.intersectsLine = function(line,skip){
 }
 module.exports = Polygon;
 
-},{"../AABB":16,"../Line":19}],27:[function(require,module,exports){
-
-var Vec2 = require("../Vec2");
-var Line = require("../Line");
-function Circle(midpoint, radius){
-  /*
-  Error checks slow things down;
-  if(typeof radius != "number") throw new Error("radius needs to be a number");
-  if(radius <= 0) throw new Error("radius needs to be greater than 0");
-  if(!(midpoint instanceof Vec2)) throw new Error("midpoint needs to be a Vec2");
-  */
-  this.radius = radius;
-  this.midpoint = midpoint;
-  this.quadraticX = [1,2*-midpoint.x,midpoint.x*midpoint.x]
-  this.quadraticY = [1,2*-midpoint.y,midpoint.y*midpoint.y]
-}
-
-Circle.construct2 = function(A,B){
-  var midpoint = A.clone().add(B).scale(1/2);
-  var radius = A.dist(B)/2;
-  return new Circle(midpoint,radius);
-}
-
-Circle.construct3 = function(A,B,C){
-  var pbAB = new Line(A, B)
-  pbAB = pbAB.perpendicularBisector();
-  var pbCB = (new Line(B, C))
-  pbCB = pbCB.perpendicularBisector();
-  var midpoint = pbAB.intersectsLine(pbCB);
-  var radius = A.dist(midpoint);
-
-  return new Circle(midpoint,radius);
-}
-
-
-var intersections = require("./intersections.js");
-
-for(var i in intersections){
-  Circle.prototype[i] = intersections[i];
-}
-
-var questions = require("./questions.js");
-
-for(var i in questions){
-  Circle.prototype[i] = questions[i];
-}
-
-
-module.exports = Circle;
-
-},{"../Line":19,"../Vec2":7,"./intersections.js":28,"./questions.js":29}],29:[function(require,module,exports){
-var Circle = {};
-var Vec2 = require("../Vec2");
-Circle.equals = function(circle){
-  return this.midpoint.equals(circle.midpoint) && this.radius === circle.radius;
-}
-
-Circle.epsilonEquals = function(circle, epsilon) {
-  return this.midpoint.epsilonEquals(circle.midpoint,epsilon)
-  && Math.abs(this.radius - circle.radius) <= epsilon;
-}
-
-module.exports = Circle;
-
-},{"../Vec2":7}],28:[function(require,module,exports){
-var Line = require("../Line");
-var Vec2 = require("../Vec2");
-var Circle = {};
-
-Circle.intersectsCircle = function(circle){
-  var line = this.midpoint.dist(circle.midpoint);
-  var leftovers = this.radius+circle.radius - line;
-  if( leftovers < 0) return false;
-  console.log(this.midpoint.clone().mid(circle.midpoint));
-  if(leftovers <= 0.1) return [this.midpoint.clone().mid(circle.midpoint)]
-
-  var slope = circle.midpoint.clone().sub(this.midpoint).normalize();
-  var pointA = slope.clone().scale(this.radius-leftovers).add(this.midpoint);
-  var pointB = slope.clone().scale(-circle.radius+leftovers).add(circle.midpoint);
-  if(pointA.equals(pointB)) return [pointA];
-
-  return this.intersectsLine(new Line(pointA,pointB).perpendicularBisector());
-}
-
-Circle.intersectsLine = function(line){
-  /*
-    x2−2x*m.x+m.x2+y2-2y*m.y+m.y2 - r2
-    -  mx + b - y
-    = intersects
-  */
-  var midpoint = this.midpoint;
-  var r = this.radius;
-  //http://mathworld.wolfram.com/Circle-LineIntersection.html
-  var t1 = line.A.clone().sub(midpoint);
-  var t2 = line.B.clone().sub(midpoint);
-  var t =  t1.clone().sub(t2);
-  var lr = t.length2();
-  var cr = t1.cross(t2);
-  var lx = t.x;
-  var ly = t.y;
-
-  var delta = r*r*lr - cr*cr;
-  // no intersection
-  if(delta < 0) return false;
-  // tangent line
-  if(delta == 0) return [new Vec2( cr*ly/lr, cr*lx/lr ).add(midpoint)];
-  //reduce calculations
-  delta = Math.sqrt(delta);
-  var crly = cr*ly;
-  var crlx = -cr*lx;
-  var sigdel = Math.sign(ly)*lx * delta;
-  var absdel = Math.abs(ly) * delta;
-  return [
-      new Vec2( (crly + sigdel) / lr, (crlx + absdel) / lr).add(midpoint),
-    new Vec2( (crly - sigdel) / lr, (crlx - absdel) / lr).add(midpoint)
-  ];
-}
-
-Circle.containsPoint = function(point){
-  return this.midpoint.dist(point) < this.radius;
-}
-
-Circle.intersectsPoint = function(point){
-  return this.midpoint.dist(point) == this.radius;
-}
-
-
-module.exports = Circle;
-
-},{"../Line":19,"../Vec2":7}],20:[function(require,module,exports){
+},{"../AABB":16,"../Line":19}],20:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Delaney = require("delaunay-fast")
 
@@ -2191,7 +2054,7 @@ Polygon.getDelaney = function(){
 }
 module.exports = Polygon
 
-},{"../Vec2":7,"delaunay-fast":30}],30:[function(require,module,exports){
+},{"../Vec2":7,"delaunay-fast":27}],27:[function(require,module,exports){
 var Delaunay;
 
 (function() {
