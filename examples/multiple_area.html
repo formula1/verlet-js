@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Verlet Blob Simulation</title>
+  <title>Verlet Multiple Blobs</title>
   <meta charset="UTF-8" />
   <link rel="stylesheet" href="../css/style.css" type="text/css" media="screen, projection" />
   <link href='http://fonts.googleapis.com/css?family=Libre+Baskerville:400,700,400italic' rel='stylesheet' type='text/css'>
@@ -19,7 +19,7 @@
 
   Test of an area constraint
   <h4>Source Code</h4>
-  <a href="https://github.com/formula1/verlet-js/blob/temp/examples/area0.html">View on GitHub</a>
+  <a href="https://github.com/formula1/verlet-js/blob/temp/examples/multiple_area.html">View on GitHub</a>
 </p>
 </div>
 <canvas id="scratch" style="width: 800px; height: 500px; background-color:#000"></canvas>
@@ -50,11 +50,8 @@ window.onload = function() {
   var linearblob = new sim.Composite();
   var line_orig = new Vec2(width/4,height/4)
 
-  var angularblob = new sim.Composite();
-  var angu_orig = new Vec2(width*3/4,height*1/4);
-
-  var soloblob = new sim.Composite();
-  var solo_orig = new Vec2(width*1/2,height*1/4);
+  var linearblob2 = new sim.Composite();
+  var line_orig2 = new Vec2(width*3/4,height*1/4);
 
   var rotVec = new Vec2(distance,0);
   var orig = new Vec2();
@@ -65,11 +62,8 @@ window.onload = function() {
       linearblob.particles.push(
         new Particle(rotVec.clone().add(line_orig))
       );
-      angularblob.particles.push(
-        new Particle(rotVec.clone().add(angu_orig))
-      );
-      soloblob.particles.push(
-        new Particle(rotVec.clone().add(solo_orig))
+      linearblob2.particles.push(
+        new Particle(rotVec.clone().add(line_orig2))
       );
     }
     if(i > 0 && i < points+1){
@@ -78,27 +72,19 @@ window.onload = function() {
         linearblob.particles[i-1],
         0.02
       ));
-    }
-    if(i > 1){
-      angularblob.constraints.push(new AngleConstraint(
-        angularblob.particles[(i-2)%points],
-        angularblob.particles[(i-1)%points],
-        angularblob.particles[i%points],
+      linearblob2.constraints.push(new DistanceConstraint(
+        linearblob2.particles[i%points],
+        linearblob2.particles[i-1],
         0.02
       ));
     }
   }
   // entities
-  console.log(linearblob.particles);
-  console.log(angularblob.particles);
-  console.log(soloblob.particles);
   linearblob.constraints.push(new ScaledAreaConstraint(linearblob.particles,1));
-  angularblob.constraints.push(new ScaledAreaConstraint(angularblob.particles,1));
-  soloblob.constraints.push(new ScaledAreaConstraint(soloblob.particles,1));
+  linearblob2.constraints.push(new ScaledAreaConstraint(linearblob2.particles,1));
 
   sim.composites.push(linearblob);
-//  sim.composites.push(angularblob);
-//  sim.composites.push(soloblob);
+  sim.composites.push(linearblob2);
 
   // animation loop
   var legIndex = 0;
