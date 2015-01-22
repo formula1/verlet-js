@@ -39,7 +39,7 @@ function build(){
         console.log(e.stack);
         return;
       }
-      fs.writeFileSync(__dirname+"/js/verlet-"+pack.version+".min.js");
+      fs.writeFileSync(__dirname+"/js/verlet-"+pack.version+".min.js", result.code);
       if(!process.env.VERLET_TEST) return;
 
       tester(function(clean){
