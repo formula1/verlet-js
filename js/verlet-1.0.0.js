@@ -91,6 +91,30 @@ function Vec2(x, y) {
 	});
 }
 
+Vec2.prototype.zero = function(){
+	this.x = 0;
+	this.y = 0;
+	return this;
+}
+
+Vec2.prototype.posinf = function(){
+	this.x = Number.POSITIVE_INFINITY;
+	this.y = Number.POSITIVE_INFINITY;
+	return this;
+}
+
+Vec2.prototype.neginf = function(){
+	this.x = Number.NEGATIVE_INFINITY;
+	this.y = Number.NEGATIVE_INFINITY;
+	return this;
+}
+
+Vec2.prototype.isNaN = function(){
+	if(isNaN(this.x)) return true;
+	if(isNaN(this.y)) return true;
+	return false;
+}
+
 Vec2.prototype.clone = function(){
 	return new Vec2(this.x,this.y);
 }
@@ -376,6 +400,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 var Vec2 = require('./structures/Vec2')
+var Collision = require("./collision/collision");
 
 exports = module.exports = VerletJS
 var Particle = exports.Particle = require("./structures/Particle");
@@ -419,15 +444,6 @@ VerletJS.prototype.frame = function(step) {
 	for (c in this.composites) {
 		var particles = this.composites[c].particles;
 		for (i in particles) {
-
-			// calculate velocity
-			var velocity = particles[i].pos.clone().sub(particles[i].lastPos).scale(this.friction);
-
-			// ground friction
-			if (particles[i].pos.y >= this.height-1 && velocity.length2() > 0.000001) {
-				velocity.scale(this.groundFriction);
-			}
-
 			// save last good state
 			particles[i].lastPos.set(particles[i].pos);
 
@@ -435,7 +451,8 @@ VerletJS.prototype.frame = function(step) {
 			particles[i].pos.add(this.gravity);
 
 			// inertia
-			particles[i].pos.add(velocity);
+			particles[i].pos.add(particles[i].vel);
+
 		}
 	}
 
@@ -453,8 +470,27 @@ VerletJS.prototype.frame = function(step) {
 	// bounds checking
 	for (c in this.composites) {
 		var particles = this.composites[c].particles;
-		for (i in particles)
+		for (i in particles){
+
 			this.bounds(particles[i]);
+			// calculate velocity
+			particles[i].vel
+			.set(particles[i].pos)
+			.sub(particles[i].lastPos)
+			.scale(this.friction)
+			// ground friction
+			if (particles[i].pos.y >= this.height-1 && particles[i].vel.length2() > 0.000001) {
+				particles[i].vel.scale(this.groundFriction);
+			}
+		}
+	}
+	var l = this.composites.length;
+	var ll;
+	while(l--){
+		ll = l;
+		while(ll--){
+			Collision(this.composites[l], this.composites[ll], step);
+		}
 	}
 }
 
@@ -486,7 +522,7 @@ VerletJS.prototype.nearestEntity = function(target_vec2,radius) {
 	return entity;
 }
 
-},{"./structures/Composite":9,"./structures/Particle":8,"./structures/Vec2":7}],5:[function(require,module,exports){
+},{"./collision/collision":8,"./structures/Composite":10,"./structures/Particle":9,"./structures/Vec2":7}],5:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -524,7 +560,7 @@ exports.AngleConstraint = require("./constraints/AngleConstraint");
 exports.MidpointAreaConstraint = require("./constraints/AreaConstraint");
 exports.ScaledAreaConstraint = require("./constraints/InflateAreaConstraint");
 
-},{"./constraints/AngleConstraint":12,"./constraints/AreaConstraint":13,"./constraints/DistanceConstraint":10,"./constraints/InflateAreaConstraint":14,"./constraints/PinConstraint":11,"./structures/Vec2":7}],6:[function(require,module,exports){
+},{"./constraints/AngleConstraint":13,"./constraints/AreaConstraint":14,"./constraints/DistanceConstraint":11,"./constraints/InflateAreaConstraint":15,"./constraints/PinConstraint":12,"./structures/Vec2":7}],6:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -683,7 +719,7 @@ VerletJS.prototype.tire = function(origin, radius, segments, spokeStiffness, tre
 	return composite;
 }
 
-},{"./constraint":5,"./verlet":4}],9:[function(require,module,exports){
+},{"./constraint":5,"./verlet":4}],10:[function(require,module,exports){
 
 function Composite() {
   this.particles = [];
@@ -702,7 +738,7 @@ Composite.prototype.pin = function(index, pos) {
 
 module.exports = Composite;
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 function DistanceConstraint(a, b, stiffness, distance /*optional*/) {
   this.a = a;
   this.b = b;
@@ -728,7 +764,7 @@ DistanceConstraint.prototype.draw = function(ctx) {
 
 module.exports = DistanceConstraint;
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 function AngleConstraint(a, b, c, stiffness) {
   this.a = a;
   this.b = b;
@@ -769,11 +805,144 @@ AngleConstraint.prototype.relax = function(stepCoef) {
   module.exports = AngleConstraint;
 
 },{}],8:[function(require,module,exports){
+var AABB = require("../structures/AABB");
+
+function Collision(compositeA, compositeB, timestep){
+
+  var AABB_A = new AABB();
+  var AABB_B = new AABB();
+  var l = compositeA.particles.length;
+  while(l--){
+    AABB_A.digestPoint(compositeA.particles[l].pos);
+  }
+  l = compositeB.particles.length;
+  while(l--){
+    AABB_B.digestPoint(compositeB.particles[l].pos);
+  }
+  if(!AABB_A.intersectsAABB(AABB_B)){
+    return false;
+  }
+
+  var manifold = AABB_A.sub(AABB_A);
+
+  var suspectsA = manifold.getSuspects(compositeA.particles);
+  var suspectsB = manifold.getSuspects(compositeB.particles);
+  if(suspectsA.lines.length == 0 || suspectsB.lines.length == 0)
+    return false;
+  if(suspectsA.inside.length == 0 && suspectsB.inside.length == 0)
+    return false;
+  var l = suspectsA.inside.length;
+  var ll;
+  while(l--){
+    ll = suspectsB.lines.length;
+    while(ll--){
+      var i = suspectsB.lines[ll][2].intersectsLineSegment(suspectsA.inside[l][1]);
+      if(!i){
+        i = suspectsB.lines[ll][2].intersectsLineSegment(suspectsA.inside[l][2]);
+        if(!i) continue;
+      }
+      var p = compositeA.particles[suspectsA.inside[l][0]];
+      var a = compositeB.particles[suspectsB.lines[ll][0]];
+      var b = compositeB.particles[suspectsB.lines[ll][1]];
+
+
+      //this finds the time difference in which they first intersect
+      var res = quadraticTime(p, a, b);
+      if(!res){
+        console.log("no good time")
+        continue;
+      }
+      //make sure we're getting the best point in time, (but what is best?)
+      if(res.length == 2){
+        if(res[0] > 0){
+          if(res[1] > 0) return false
+          res = res[1];
+        }else{
+          if(res[1] > 0) res = res[0];
+          else res = Math.max(res[0],res[1]);
+        }
+      }else{
+        res = res[0];
+      }
+      if(Math.abs(res) > timestep) return false;
+
+      //this is supposed to be the point where they first intersect
+      a.pos.add(a.vel.clone().scale(res));
+      b.pos.add(b.vel.clone().scale(res));
+      p.pos.add(p.vel.clone().scale(res));
+
+      //I'm now finding the net velocity of the line at that point
+      var ab = suspectsB.lines[ll][2].length;
+      var ap = a.pos.dist(p.pos);
+      var bp = b.pos.dist(p.pos);
+      var netv = a.vel.clone().scale(ap/ab).add(b.vel.clone().scale(bp/ab));
+
+      //now distributing momentum
+      netv.add(p.vel).scale(1/2)
+      p.vel.set(netv);
+      if(ap != 0)
+        a.vel.set(netv.clone().sub(netv.clone().scale(bp/ab)).scale(ab/ap));
+      if(bp != 0)
+        b.vel.set(netv.clone().sub(netv.clone().scale(ap/ab)).scale(ab/bp));
+
+      //now configuring new point
+      a.pos.add(a.vel.clone().scale(timestep-res));
+      b.pos.add(b.vel.clone().scale(timestep-res));
+      p.pos.add(p.vel.clone().scale(timestep-res));
+    }
+  }
+  console.log("collision solved");
+}
+
+function quadraticTime(intp, linepA, linepB){
+  var posp = intp.pos;
+  var pospA = linepA.pos;
+  var pospB = linepB.pos;
+  var velp = intp.vel;
+  var velpA = linepA.vel;
+  var velpB = linepB.vel;
+
+  var a = velpB.cross(velpA) + velp.cross(velpA.clone().sub(velpB));
+
+  var b = posp.clone().cross(velpA.clone().sub(velpB))
+  + velp.cross(pospA.clone().sub(pospB))
+  + pospA.cross(velpB)
+  + pospB.cross(velpA)
+  + pospA.cross(velpA)*2;
+
+  var c = posp.cross(pospA.clone().sub(pospB))
+  + pospB.x*pospB.y - pospA.x*pospA.y;
+
+  if(a === 0){
+    //no need for quadratic
+    return [-c/b]
+  }
+
+
+  var squared = Math.pow(b,2) - 4*a*c;
+  if(squared < 0){
+    console.log("QuadraticTime: b^2 - 4ac < 0");
+    return false;
+  }
+  if(squared == 0){
+    return [-b/(2*a)];
+  }
+  console.log(Math.sqrt(squared));
+  var minus = (-b - Math.sqrt(squared))/(2*a)
+  var plus = (-b + Math.sqrt(squared))/(2*a)
+
+  return [minus,plus]
+}
+
+module.exports = Collision;
+
+},{"../structures/AABB":16}],9:[function(require,module,exports){
 var Vec2 = require("./Vec2")
 
 function Particle(pos) {
   this.pos = (new Vec2()).set(pos);
   this.lastPos = (new Vec2()).set(pos);
+  this.vel = new Vec2();
 }
 
 Particle.prototype.draw = function(ctx) {
@@ -786,7 +955,7 @@ Particle.prototype.draw = function(ctx) {
 
 module.exports = Particle;
 
-},{"./Vec2":7}],11:[function(require,module,exports){
+},{"./Vec2":7}],12:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2")
 
 function PinConstraint(a, pos) {
@@ -807,7 +976,7 @@ PinConstraint.prototype.draw = function(ctx) {
 
 module.exports = PinConstraint;
 
-},{"../structures/Vec2":7}],13:[function(require,module,exports){
+},{"../structures/Vec2":7}],14:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
 var Triangle = require("../structures/Triangle");
 var Polygon = require("../structures/Polygon");
@@ -1037,7 +1206,7 @@ There are a few issues here
 
 */
 
-},{"../structures/AABB":15,"../structures/Polygon":17,"../structures/Triangle":16,"../structures/Vec2":7}],14:[function(require,module,exports){
+},{"../structures/AABB":16,"../structures/Polygon":18,"../structures/Triangle":17,"../structures/Vec2":7}],15:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
 var Line = require("../structures/Line");
 var Triangle = require("../structures/Triangle");
@@ -1105,7 +1274,7 @@ AreaConstraint.prototype.relax = function(stepCoef) {
     this.points[l].sub(nm).add(mid);
   }
   this.storedarea = area*diff;
-  this.storedmid = nm;
+  this.storedmid = mid;
 }
 AreaConstraint.prototype.draw = function(ctx) {
   var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
@@ -1115,6 +1284,17 @@ AreaConstraint.prototype.draw = function(ctx) {
   var intersects = [];
   var eq = false;
   var effectivepoints = [];
+  //fill
+  var l = this.points.length-1;
+  ctx.beginPath();
+  ctx.moveTo(this.points[l].x, this.points[l].y);
+  while(l--){
+    ctx.lineTo(this.points[l].x,this.points[l].y);
+  }
+  var g = (diff < inv)?diff:inv;
+  ctx.closePath();
+  ctx.fillStyle="rgba("+diff+","+g+","+inv+",0.6)";
+  ctx.fill();
   //delaney
   /*
   var tri = this.points.getDelaney();
@@ -1142,25 +1322,10 @@ AreaConstraint.prototype.draw = function(ctx) {
     }
     effectivepoints.push(curr);
     var tri = new Triangle(prev,curr,next);
-    ctx.beginPath();
-    ctx.arc(
-      curr.x,
-      curr.y,
-      4, 0, 2 * Math.PI, false
-    );
-    ctx.fillStyle = "#FFFF00";
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(
-      prev.x,
-      prev.y,
-      4, 0, 2 * Math.PI, false
-    );
-    ctx.fillStyle = "#FF00FF";
-    ctx.fill();
 
     var mp = tri.getConcaveBisector();
 
+    var badarea = false;
     if( tri.CA.pointIsLeftOrTop(mp.B) == tri.CA.pointIsLeftOrTop(tri.B)){
       ctx.strokeStyle = "#FFFF00";
       if(tri.hasPoint(_this.storedmid)){
@@ -1168,6 +1333,9 @@ AreaConstraint.prototype.draw = function(ctx) {
       }
     }else{
       ctx.strokeStyle = "#FF00FF";
+      if(tri.partialArea < 0){
+        badarea = true;
+      }
     }
     var intersections = _this.points.intersectsLine(new Line(prev,curr),i);
     if(intersections.length > 0){
@@ -1179,19 +1347,17 @@ AreaConstraint.prototype.draw = function(ctx) {
     ctx.lineTo(curr.x,curr.y);
     ctx.lineTo((next.x+curr.x)/2, (next.y+curr.y)/2);
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(
+      curr.x,
+      curr.y,
+      10, Math.atan(1/tri.AB.slope.slope()), Math.atan(tri.BC.slope.slope()), false
+    );
+    ctx.fillStyle = "#FF8300";
+    ctx.fill();
   })
   ctx.lineWidth = 1;
-  //fill
-  var l = effectivepoints.length-1;
-  ctx.beginPath();
-  ctx.moveTo(effectivepoints[l].x, effectivepoints[l].y);
-  while(l--){
-    ctx.lineTo(effectivepoints[l].x,effectivepoints[l].y);
-  }
-  var g = (diff < inv)?diff:inv;
-  ctx.closePath();
-  ctx.fillStyle="rgba("+diff+","+g+","+inv+",0.6)";
-  ctx.fill();
 
   //intersects
   for(var i=intersects.length;i--;){
@@ -1253,12 +1419,13 @@ a/Sin(A) = b/Sin(B) = c/Sin(C)
 A = Sin(A)* Sin(C) * b^2 / (Sin(B)*Sin(90))
 */
 
-},{"../structures/AABB":15,"../structures/Line":18,"../structures/Polygon":17,"../structures/Triangle":16,"../structures/Vec2":7}],15:[function(require,module,exports){
+},{"../structures/AABB":16,"../structures/Line":19,"../structures/Polygon":18,"../structures/Triangle":17,"../structures/Vec2":7}],16:[function(require,module,exports){
 var Vec2 = require("./Vec2");
+var Line = require("./Line");
 
 function AABB (points){
-  this.max = new Vec2(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
-  this.min = new Vec2(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+  this.max = new Vec2().neginf();
+  this.min = new Vec2().posinf();
   if(points){
     if(arguments.length > 1){
       var l = arguments.length;
@@ -1283,6 +1450,86 @@ AABB.prototype.intersectsAABB = function(oAABB){
   return true;
 }
 
+AABB.prototype.sub = function(oAABB){
+  this.min.max(oAABB.min);
+  this.max.min(oAABB.max);
+  return this;
+}
+
+
+AABB.prototype.getSuspects =function(particles){
+  var lines = [];
+  var inside = [];
+  var done = [];
+  var l = particles.length;
+  var len = l;
+  var xboo = false, yboo = false;
+  var prev, temp, next;
+  while(l--){
+    xboo = (
+      particles[l].pos.x <= this.max.x
+    &&
+      particles[l].pos.x >= this.min.x
+    );
+    yboo = (
+      particles[l].pos.y <= this.max.y
+      &&
+      particles[l].pos.y >= this.min.y
+    );
+    if(xboo && yboo){
+      temp = new Array(3);
+      temp[0] = l
+
+      prev = (l+len-1)%len;
+      temp[1] = new Line(
+        particles[prev].pos,
+        particles[l].pos
+      );
+      if(done.indexOf(prev+"|"+l) == -1){
+        lines.push([prev,l,temp[1]]);
+        done.push(prev+"|"+l);
+      }
+      next = (l+1)%len;
+      temp[2] = new Line(
+        particles[l].pos,
+        particles[next].pos
+      );
+      if(done.indexOf(l+"|"+next) == -1){
+        lines.push([l,next,temp[2]]);
+        done.push(l+"|"+next);
+      }
+      inside.push(temp);
+      continue;
+    }
+    if(xboo || yboo){
+      prev = (l+len-1)%len;
+      if(done.indexOf(prev+"|"+l) == -1){
+        temp = new Line(
+          particles[prev].pos,
+          particles[l].pos
+        );
+        if(this.intersectsLine(temp)){
+          lines.push([prev,l,temp]);
+        }
+        done.push(prev+"|"+l)
+      }
+      next = (l+1)%len;
+      if(done.indexOf(l+"|"+next) == -1){
+        temp = new Line(
+          particles[l].pos,
+          particles[next].pos
+        );
+        if(this.intersectsLine(temp)){
+          lines.push([l,next,temp]);
+        }
+        done.push(l+"|"+next)
+      }
+    }
+  }
+  return {inside:inside, lines:lines};
+}
+
+
 AABB.prototype.containsPoint = function(point){
   if(point.x >= this.max.x) return false;
   if(point.y >= this.max.y) return false;
@@ -1291,22 +1538,40 @@ AABB.prototype.containsPoint = function(point){
   return true;
 }
 
+AABB.prototype.intersectsLine = function(line){
+  var tline = new Line(this.max, new Vec2(this.min.x,this.max.y));
+  var p = tline.intersectsLineSegment(line);
+  if(p && this.containsPoint(p)) return true;
+  tline = new Line(this.max, new Vec2(this.max.x,this.min.y));
+  p = tline.intersectsLineSegment(line);
+  if(p && this.containsPoint(p)) return true;
+  tline = new Line(this.min, new Vec2(this.max.x,this.min.y));
+  p = tline.intersectsLineSegment(line);
+  if(p && this.containsPoint(p)) return true;
+  tline = new Line(this.min, new Vec2(this.min.x,this.max.y));
+  p = tline.intersectsLineSegment(line);
+  if(p && this.containsPoint(p)) return true;
+  return false;
+}
+
+
 AABB.prototype.intersectsCircle = function(c){
   if(c.containsPoint(this.max)) return true;
   if(c.containsPoint(this.min)) return true;
-  if(c.containsPoint(this.min.x,this.max.y)) return true;
-  if(c.containsPoint(this.max.x,this.min.y)) return true;
+  if(c.containsPoint(new Vec2(this.min.x,this.max.y))) return true;
+  if(c.containsPoint(new Vec2(this.max.x,this.min.y))) return true;
   return false;
 }
 
 module.exports = AABB;
 
-},{"./Vec2":7}],17:[function(require,module,exports){
+},{"./Line":19,"./Vec2":7}],18:[function(require,module,exports){
 function Polygon(oPoints){
-  var i = oPoints.length;
+  var l = oPoints.length;
+  var i = l;
   var points = Array(i);
   while (i--) {
-    points[i] = oPoints[i].pos||oPoints[i];
+    points[l-i-1] = oPoints[i].pos||oPoints[i];
   }
   for(var i in Polygon.prototype){
     Object.defineProperty(points,i,{
@@ -1334,24 +1599,12 @@ Polygon.prototype.clone = function(){
 
 Polygon.prototype.forThree = function(fn,skip){
   var l = this.length;
-  if(!this.clean){
-    for(var i=skip||0;i<l;i++){
-      var prev = (i+l-1)%l;//((i == 0)?l:i) -1
-      var curr = i;
-      var next = (i+1)%l; //i == l-1?0:i+1
-      this[prev] = this[prev].pos||this[prev];
-      this[curr] = this[curr].pos||this[curr];
-      this[next] = this[next].pos||this[next];
-      fn.call(this,this[prev],this[curr],this[next], curr);
-    }
-    this.clean = true;
-  }else{
-    for(var i=skip||0;i<l;i++){
-      var prev = (i+l-1)%l;//((i == 0)?l:i) -1
-      var curr = i;
-      var next = (i+1)%l; //i == l-1?0:i+1
-      fn.call(this,this[prev],this[curr],this[next], curr);
-    }
+  var i = l - (skip||0);
+  while(i--){
+    var prev = (i+1)%l;//((i == 0)?l:i) -1
+    var curr = i;
+    var next = (i+l-1)%l; //i == l-1?0:i+1
+    fn.call(this,this[prev],this[curr],this[next], curr);
   }
 }
 
@@ -1366,7 +1619,7 @@ for(var i in intersects){
 
 module.exports = Polygon;
 
-},{"./cachable":19,"./intersects":20}],18:[function(require,module,exports){
+},{"./cachable":20,"./intersects":21}],19:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 
 
@@ -1428,7 +1681,7 @@ for(var i in eq){
 
 module.exports = Line;
 
-},{"../Vec2":7,"./equals.js":22,"./intersections.js":21}],16:[function(require,module,exports){
+},{"../Vec2":7,"./equals.js":23,"./intersections.js":22}],17:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = require("../Line");
 var Circle = require("../Circle");
@@ -1473,7 +1726,7 @@ for(var i in constructs){
 
 module.exports = Triangle;
 
-},{"../Circle":26,"../Line":18,"../Vec2":7,"./construct.js":25,"./intersections.js":23,"./questions.js":24}],23:[function(require,module,exports){
+},{"../Circle":27,"../Line":19,"../Vec2":7,"./construct.js":26,"./intersections.js":24,"./questions.js":25}],24:[function(require,module,exports){
 var Triangle = {};
 
 Triangle.hasPoint = function(point){
@@ -1501,7 +1754,7 @@ Triangle.hasPoint = function(point){
 
 module.exports = Triangle;
 
-},{}],24:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 
 var Triangle = {};
 
@@ -1572,7 +1825,7 @@ Triangle.equalAngles = function(tri) {
 
 module.exports = Triangle;
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var Line = {};
 
 Line.equals = function(line){
@@ -1610,7 +1863,7 @@ Line.epsilonEqualMagnitude = function(line, epsilon) {
 
 module.exports =  Line;
 
-},{}],21:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = {};
 
@@ -1638,6 +1891,20 @@ Line.intersectsLine = function(lineB){
   return intersect;
 }
 
+Line.intersectsLineSegment = function(line){
+  var intersect = this.intersectsLine(line);
+  if(!intersect) return false;
+  if(!(new Vec2().posinf().min(this.A).min(this.B).max(intersect).equals(intersect)))
+    return false;
+  if(!(new Vec2().neginf().max(this.A).max(this.B).min(intersect).equals(intersect)))
+    return false;
+  if(!(new Vec2().posinf().min(line.A).min(line.B).max(intersect).equals(intersect)))
+    return false;
+  if(!(new Vec2().neginf().max(line.A).max(line.B).min(intersect).equals(intersect)))
+    return false;
+  return intersect;
+}
+
 Line.pointIsLeftOrTop = function(p){
   //get slopes of the lines
   //see if a ray cast from 0,0 intersects it
@@ -1651,7 +1918,7 @@ Line.intersectsPoint = function(p){
 
 module.exports = Line;
 
-},{"../Vec2":7}],25:[function(require,module,exports){
+},{"../Vec2":7}],26:[function(require,module,exports){
 
 var Circle = require("../Circle");
 var Triangle = {};
@@ -1713,7 +1980,7 @@ Triangle.getCircumCircle = function(tri){
 }
 */
 
-},{"../Circle":26}],20:[function(require,module,exports){
+},{"../Circle":27}],21:[function(require,module,exports){
 var AABB = require("../AABB")
 var Line = require("../Line");
 var Polygon = {};
@@ -1755,7 +2022,7 @@ Polygon.intersectsLine = function(line,skip){
 }
 module.exports = Polygon;
 
-},{"../AABB":15,"../Line":18}],26:[function(require,module,exports){
+},{"../AABB":16,"../Line":19}],27:[function(require,module,exports){
 
 var Vec2 = require("../Vec2");
 var Line = require("../Line");
@@ -1805,7 +2072,7 @@ for(var i in questions){
 
 module.exports = Circle;
 
-},{"../Line":18,"../Vec2":7,"./intersections.js":27,"./questions.js":28}],28:[function(require,module,exports){
+},{"../Line":19,"../Vec2":7,"./intersections.js":28,"./questions.js":29}],29:[function(require,module,exports){
 var Circle = {};
 var Vec2 = require("../Vec2");
 Circle.equals = function(circle){
@@ -1819,7 +2086,7 @@ Circle.epsilonEquals = function(circle, epsilon) {
 
 module.exports = Circle;
 
-},{"../Vec2":7}],27:[function(require,module,exports){
+},{"../Vec2":7}],28:[function(require,module,exports){
 var Line = require("../Line");
 var Vec2 = require("../Vec2");
 var Circle = {};
@@ -1884,7 +2151,7 @@ Circle.intersectsPoint = function(point){
 
 module.exports = Circle;
 
-},{"../Line":18,"../Vec2":7}],19:[function(require,module,exports){
+},{"../Line":19,"../Vec2":7}],20:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Delaney = require("delaunay-fast")
 
@@ -1924,7 +2191,7 @@ Polygon.getDelaney = function(){
 }
 module.exports = Polygon
 
-},{"../Vec2":7,"delaunay-fast":29}],29:[function(require,module,exports){
+},{"../Vec2":7,"delaunay-fast":30}],30:[function(require,module,exports){
 var Delaunay;
 
 (function() {

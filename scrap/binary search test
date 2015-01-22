@@ -1,0 +1,69 @@
+var xari = new Array(ari.length);
+var yari = new Array(ari.length);
+var xari2 = new Array(ari2.length);
+var yari2 = new Array(ari2.length);
+
+var l = ari.length;
+while(l--){
+  xari[l] = ari[l]; yari[l] = ari[l];
+  xari2[l] = ari2[l]; yari2[l] = ari2[l]
+}
+xari.sort(function(a,b){
+a.x - b.x
+});
+yari.sort(function(a,b){
+a.y - b.y
+});
+xari2.sort(function(a,b){
+a.x - b.x
+});
+yari2.sort(function(a,b){
+a.y - b.y
+});
+
+l = ari.length;
+l2 = ari2.length;
+var netAABB = {
+  max: {
+    x:Math.min(xari[0].x,xari2[0].x),
+    y:Math.min(yari[0].y,yari2[0].y)
+  },
+  min: {
+    x:xari[l-1], y:yari[l-1]
+    x:Math.max(xari[l-1].x,xari2[l2-1].x),
+    y:Math.max(yari[l-1].y,yari2[l2-1].y)
+  }
+}
+
+var index = binarySearch(xari, function(b){
+  return netAABB.min.x - b.x;
+}) + 1;
+var ari_suspects = [];
+while(index--){
+  if(xari[index].x > netAABB.max.x) break;
+  if(
+      xari[index].x >= this.max.x
+    &&
+      xari[index].x <= this.min.x
+    &&
+      xari[index].y >= this.max.y
+    &&
+      xari[index].y <= this.min.y
+  ) ari_suspects.push(l);
+}
+index = binarySearch(xari2, function(b){
+  return netAABB.min.x - b.x;
+}) + 1;
+var ari2_suspects = [];
+while(index--){
+  if(xari2[index].x > netAABB.max.x) break;
+  if(
+      xari2[index].x >= this.max.x
+    &&
+      xari2[index].x <= this.min.x
+    &&
+      xari2[index].y >= this.max.y
+    &&
+      xari2[index].y <= this.min.y
+  ) ari2_suspects.push(index);
+}
