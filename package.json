@@ -1,38 +1,40 @@
 {
-	"name": "verlet",
-	"version": "1.0.0",
-	"description": "simple 2d physics for js.",
-	"main": "./lib/verlet",
-	"directories": {
-		"example": "examples"
-	},
-	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
-		"build": "node build.js",
-		"watch-build": "WATCH=true node build.js",
-		"watch-build-test": "VERLET_WATCH=true VERLET_TEST=true node build.js"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git://github.com/subprotocol/verlet-js.git"
-	},
-	"keywords": [
-		"physics",
-		"2d",
-		"verlet"
-	],
-	"author": "subprotocol",
-	"license": "BSD",
-	"readmeFilename": "README.md",
-	"gitHead": "283d23fa020d5147e95e84c5ff3541c17ea2abe5",
-	"bugs": {
-		"url": "https://github.com/subprotocol/verlet-js/issues"
-	},
-	"dependencies": {},
-	"devDependencies": {
-		"node-watch": "latest",
-		"async": "latest",
-		"browserify": "~2.18.1",
-		"uglify-js": "~2.3.6"
-	}
+  "name": "verlet",
+  "version": "1.0.0",
+  "description": "simple 2d physics for js.",
+  "main": "./lib/verlet",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "node build.js",
+    "watch-build": "WATCH=true node build.js",
+    "watch-build-test": "VERLET_WATCH=true VERLET_TEST=true node build.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/subprotocol/verlet-js.git"
+  },
+  "keywords": [
+    "physics",
+    "2d",
+    "verlet"
+  ],
+  "author": "subprotocol",
+  "license": "BSD",
+  "readmeFilename": "README.md",
+  "gitHead": "283d23fa020d5147e95e84c5ff3541c17ea2abe5",
+  "bugs": {
+    "url": "https://github.com/subprotocol/verlet-js/issues"
+  },
+  "dependencies": {
+    "box-intersect": "^1.0.0"
+  },
+  "devDependencies": {
+    "node-watch": "latest",
+    "async": "latest",
+    "browserify": "~2.18.1",
+    "uglify-js": "~2.3.6"
+  }
 }

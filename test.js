@@ -10,7 +10,7 @@ function runTest(cb){
     console.log("============================\n");
     console.log(title);
     console.log("\n============================");
-  }
+  };
   var clean = true;
   async.eachSeries(
     fs.readdirSync("./tests"),
@@ -27,7 +27,7 @@ function runTest(cb){
         },function(){
           next();
         }
-      )
+      );
     },function(){
       cb(clean);
     }

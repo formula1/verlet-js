@@ -2,8 +2,8 @@ require("../../lib/verlet-polyfill");
 var Vec2 = require("../../lib/structures/Vec2");
 
 var assert = function(label, expression) {
-  console.log("Vec2(" + label + "): " + (expression == true ? "PASS" : "FAIL"));
-  if (expression != true)
+  console.log("Vec2(" + label + "): " + (expression === true ? "PASS" : "FAIL"));
+  if (expression !== true)
     throw "assertion failed";
 };
 
@@ -70,7 +70,7 @@ assert("length2", (new Vec2(3,4)).length2() == 25);
 assert("dist", (new Vec2(0,4)).dist(new Vec2(3,0)) == 5);
 assert("dist2", (new Vec2(0,4)).dist2(new Vec2(3,0)) == 25);
 
-var normal = (new Vec2(3,4)).normal()
+var normal = (new Vec2(3,4)).normal();
 assert("normal", Math.abs(normal.length() - 1.0) <= 0.00001 && normal.epsilonEquals(new Vec2(3/5, 4/5), 0.0001));
 assert("dot", (new Vec2(2,3)).dot(new Vec2(4,1)) == 11);
 assert("cross", (new Vec2(2,3)).cross(new Vec2(4,1)) == -10);
