@@ -377,7 +377,151 @@ VerletDraw.prototype.draw = function() {
   }
 }
 
-},{"./verlet.js":4}],5:[function(require,module,exports){
+},{"./verlet.js":4}],4:[function(require,module,exports){
+
+/*
+Copyright 2013 Sub Protocol and other contributors
+http://subprotocol.com/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+var Vec2 = require('./structures/Vec2');
+var Collision = require("./collision/collision");
+
+exports = module.exports = VerletJS;
+var Particle = exports.Particle = require("./structures/Particle");
+var Composite = exports.Composite = require("./structures/Composite");
+exports.Composite = Composite;
+
+
+function VerletJS(width, height) {
+	this.width = width;
+	this.height = height;
+
+	this.bounds = function (particle) {
+		if (particle.pos.y > this.height-1)
+			particle.pos.y = this.height-1;
+
+		if (particle.pos.x < 0)
+			particle.pos.x = 0;
+
+		if (particle.pos.x > this.width-1)
+			particle.pos.x = this.width-1;
+	};
+
+	// simulation params
+	this.gravity = new Vec2(0,0.2);
+	this.friction = 0.99;
+	this.groundFriction = 0.8;
+
+	// holds composite entities
+	this.composites = [];
+}
+
+VerletJS.prototype.Composite = Composite;
+
+VerletJS.prototype.logic = function(){
+	throw new Error("Logic hasn't been set");
+};
+
+VerletJS.prototype.frame = function(step) {
+	var i, j, c, particles;
+
+	for (c in this.composites) {
+		particles = this.composites[c].particles;
+		for (i in particles) {
+			// save last good state
+			particles[i].lastPos.set(particles[i].pos);
+
+			// gravity
+			particles[i].pos.add(this.gravity);
+
+			if (particles[i].pos.y >= this.height-1 && particles[i].vel.length2() > 0.000001) {
+				particles[i].vel.scale(this.groundFriction);
+			}
+
+			// inertia
+			particles[i].pos.add(particles[i].vel.scale(this.friction));
+
+
+		}
+	}
+
+	// relax
+	var stepCoef = 1/step;
+	for (c in this.composites) {
+		var constraints = this.composites[c].constraints;
+		for (i=0;i<step;++i)
+			for (j in constraints)
+				constraints[j].relax(stepCoef);
+	}
+
+	// bounds checking
+	for (c in this.composites) {
+		particles = this.composites[c].particles;
+		this.composites[c].aabb.clear();
+		for (i in particles){
+
+			this.bounds(particles[i]);
+			// calculate velocity
+			particles[i].vel
+			.set(particles[i].pos)
+			.sub(particles[i].lastPos);
+			// ground friction
+			this.composites[c].aabb.digestPoint(particles[i].pos);
+		}
+	}
+	Collision(this.composites,step);
+	this.logic();
+};
+
+
+VerletJS.prototype.nearestEntity = function(target_vec2,radius) {
+	var c, i;
+	var d2Nearest = 0;
+	var entity = null;
+	var constraintsNearest = null;
+
+	// find nearest point
+	for (c in this.composites) {
+		var particles = this.composites[c].particles;
+		for (i in particles) {
+			var d2 = particles[i].pos.dist2(target_vec2);
+			if (d2 <= radius*radius && (entity === null || d2 < d2Nearest)) {
+				entity = particles[i];
+				constraintsNearest = this.composites[c].constraints;
+				d2Nearest = d2;
+			}
+		}
+	}
+
+	// search for pinned constraints for this entity
+	for (i in constraintsNearest)
+		if (constraintsNearest[i] instanceof PinConstraint && constraintsNearest[i].a == entity)
+			entity = constraintsNearest[i];
+
+	return entity;
+};
+
+},{"./collision/collision":8,"./structures/Composite":10,"./structures/Particle":9,"./structures/Vec2":7}],5:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -415,7 +559,7 @@ exports.AngleConstraint = require("./constraints/AngleConstraint");
 exports.MidpointAreaConstraint = require("./constraints/AreaConstraint");
 exports.ScaledAreaConstraint = require("./constraints/InflateAreaConstraint");
 
-},{"./constraints/AngleConstraint":10,"./constraints/AreaConstraint":11,"./constraints/DistanceConstraint":8,"./constraints/InflateAreaConstraint":12,"./constraints/PinConstraint":9,"./structures/Vec2":7}],6:[function(require,module,exports){
+},{"./constraints/AngleConstraint":13,"./constraints/AreaConstraint":14,"./constraints/DistanceConstraint":11,"./constraints/InflateAreaConstraint":15,"./constraints/PinConstraint":12,"./structures/Vec2":7}],6:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -574,7 +718,33 @@ VerletJS.prototype.tire = function(origin, radius, segments, spokeStiffness, tre
 	return composite;
 }
 
-},{"./constraint":5,"./verlet":4}],10:[function(require,module,exports){
+},{"./constraint":5,"./verlet":4}],11:[function(require,module,exports){
+function DistanceConstraint(a, b, stiffness, distance /*optional*/) {
+  this.a = a;
+  this.b = b;
+  this.distance = typeof distance != "undefined" ? distance : a.pos.clone().sub(b.pos).length();
+  this.stiffness = stiffness;
+}
+
+DistanceConstraint.prototype.relax = function(stepCoef) {
+  var normal = this.a.pos.clone().sub(this.b.pos);
+  var m = normal.length2();
+  normal.scale(((this.distance*this.distance - m)/m)*this.stiffness*stepCoef);
+  this.a.pos.add(normal);
+  this.b.pos.sub(normal);
+}
+
+DistanceConstraint.prototype.draw = function(ctx) {
+  ctx.beginPath();
+  ctx.moveTo(this.a.pos.x, this.a.pos.y);
+  ctx.lineTo(this.b.pos.x, this.b.pos.y);
+  ctx.strokeStyle = "#d8dde2";
+  ctx.stroke();
+}
+
+module.exports = DistanceConstraint;
+
+},{}],13:[function(require,module,exports){
 function AngleConstraint(a, b, c, stiffness) {
   this.a = a;
   this.b = b;
@@ -614,177 +784,47 @@ AngleConstraint.prototype.relax = function(stepCoef) {
 
   module.exports = AngleConstraint;
 
-},{}],8:[function(require,module,exports){
-function DistanceConstraint(a, b, stiffness, distance /*optional*/) {
-  this.a = a;
-  this.b = b;
-  this.distance = typeof distance != "undefined" ? distance : a.pos.clone().sub(b.pos).length();
-  this.stiffness = stiffness;
+},{}],9:[function(require,module,exports){
+var Vec2 = require("./Vec2")
+
+function Particle(pos) {
+  this.pos = (new Vec2()).set(pos);
+  this.lastPos = (new Vec2()).set(pos);
+  this.vel = new Vec2();
 }
 
-DistanceConstraint.prototype.relax = function(stepCoef) {
-  var normal = this.a.pos.clone().sub(this.b.pos);
-  var m = normal.length2();
-  normal.scale(((this.distance*this.distance - m)/m)*this.stiffness*stepCoef);
-  this.a.pos.add(normal);
-  this.b.pos.sub(normal);
-}
-
-DistanceConstraint.prototype.draw = function(ctx) {
+Particle.prototype.draw = function(ctx) {
   ctx.beginPath();
-  ctx.moveTo(this.a.pos.x, this.a.pos.y);
-  ctx.lineTo(this.b.pos.x, this.b.pos.y);
-  ctx.strokeStyle = "#d8dde2";
-  ctx.stroke();
+  ctx.arc(this.pos.x, this.pos.y, 2, 0, 2*Math.PI);
+  ctx.fillStyle = "#2dad8f";
+  ctx.fill();
 }
 
-module.exports = DistanceConstraint;
 
-},{}],4:[function(require,module,exports){
+module.exports = Particle;
 
-/*
-Copyright 2013 Sub Protocol and other contributors
-http://subprotocol.com/
+},{"./Vec2":7}],10:[function(require,module,exports){
+var AABB = require("./AABB");
 
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
+function Composite() {
+  this.particles = [];
+  this.constraints = [];
+  this.aabb = new AABB();
 
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-var Vec2 = require('./structures/Vec2');
-var Collision = require("./collision/collision");
-
-exports = module.exports = VerletJS;
-var Particle = exports.Particle = require("./structures/Particle");
-var Composite = exports.Composite = require("./structures/Composite");
-exports.Composite = Composite;
-
-
-function VerletJS(width, height) {
-	this.width = width;
-	this.height = height;
-
-	this.bounds = function (particle) {
-		if (particle.pos.y > this.height-1)
-			particle.pos.y = this.height-1;
-
-		if (particle.pos.x < 0)
-			particle.pos.x = 0;
-
-		if (particle.pos.x > this.width-1)
-			particle.pos.x = this.width-1;
-	};
-
-	// simulation params
-	this.gravity = new Vec2(0,0.2);
-	this.friction = 0.99;
-	this.groundFriction = 0.8;
-
-	// holds composite entities
-	this.composites = [];
+  this.drawParticles = null;
+  this.drawConstraints = null;
 }
 
-VerletJS.prototype.Composite = Composite;
-
-VerletJS.prototype.logic = function(){
-	throw new Error("Logic hasn't been set");
+Composite.prototype.pin = function(index, pos) {
+  pos = pos || this.particles[index].pos;
+  var pc = new PinConstraint(this.particles[index], pos);
+  this.constraints.push(pc);
+  return pc;
 };
 
-VerletJS.prototype.frame = function(step) {
-	var i, j, c, particles;
+module.exports = Composite;
 
-	for (c in this.composites) {
-		particles = this.composites[c].particles;
-		for (i in particles) {
-			// save last good state
-			particles[i].lastPos.set(particles[i].pos);
-
-			// gravity
-			particles[i].pos.add(this.gravity);
-
-			if (particles[i].pos.y >= this.height-1 && particles[i].vel.length2() > 0.000001) {
-				particles[i].vel.scale(this.groundFriction);
-			}
-
-			// inertia
-			particles[i].pos.add(particles[i].vel.scale(this.friction));
-
-
-		}
-	}
-
-	// relax
-	var stepCoef = 1/step;
-	for (c in this.composites) {
-		var constraints = this.composites[c].constraints;
-		for (i=0;i<step;++i)
-			for (j in constraints)
-				constraints[j].relax(stepCoef);
-	}
-
-	// bounds checking
-	for (c in this.composites) {
-		particles = this.composites[c].particles;
-		this.composites[c].aabb.clear();
-		for (i in particles){
-
-			this.bounds(particles[i]);
-			// calculate velocity
-			particles[i].vel
-			.set(particles[i].pos)
-			.sub(particles[i].lastPos);
-			// ground friction
-			this.composites[c].aabb.digestPoint(particles[i].pos);
-		}
-	}
-	Collision(this.composites,step);
-	this.logic();
-};
-
-
-VerletJS.prototype.nearestEntity = function(target_vec2,radius) {
-	var c, i;
-	var d2Nearest = 0;
-	var entity = null;
-	var constraintsNearest = null;
-
-	// find nearest point
-	for (c in this.composites) {
-		var particles = this.composites[c].particles;
-		for (i in particles) {
-			var d2 = particles[i].pos.dist2(target_vec2);
-			if (d2 <= radius*radius && (entity === null || d2 < d2Nearest)) {
-				entity = particles[i];
-				constraintsNearest = this.composites[c].constraints;
-				d2Nearest = d2;
-			}
-		}
-	}
-
-	// search for pinned constraints for this entity
-	for (i in constraintsNearest)
-		if (constraintsNearest[i] instanceof PinConstraint && constraintsNearest[i].a == entity)
-			entity = constraintsNearest[i];
-
-	return entity;
-};
-
-},{"./collision/collision":13,"./structures/Composite":15,"./structures/Particle":14,"./structures/Vec2":7}],9:[function(require,module,exports){
+},{"./AABB":16}],12:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2")
 
 function PinConstraint(a, pos) {
@@ -805,7 +845,7 @@ PinConstraint.prototype.draw = function(ctx) {
 
 module.exports = PinConstraint;
 
-},{"../structures/Vec2":7}],11:[function(require,module,exports){
+},{"../structures/Vec2":7}],14:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
 var Triangle = require("../structures/Triangle");
 var Polygon = require("../structures/Polygon");
@@ -1035,47 +1075,7 @@ There are a few issues here
 
 */
 
-},{"../structures/AABB":16,"../structures/Polygon":18,"../structures/Triangle":17,"../structures/Vec2":7}],14:[function(require,module,exports){
-var Vec2 = require("./Vec2")
-
-function Particle(pos) {
-  this.pos = (new Vec2()).set(pos);
-  this.lastPos = (new Vec2()).set(pos);
-  this.vel = new Vec2();
-}
-
-Particle.prototype.draw = function(ctx) {
-  ctx.beginPath();
-  ctx.arc(this.pos.x, this.pos.y, 2, 0, 2*Math.PI);
-  ctx.fillStyle = "#2dad8f";
-  ctx.fill();
-}
-
-
-module.exports = Particle;
-
-},{"./Vec2":7}],15:[function(require,module,exports){
-var AABB = require("./AABB");
-
-function Composite() {
-  this.particles = [];
-  this.constraints = [];
-  this.aabb = new AABB();
-
-  this.drawParticles = null;
-  this.drawConstraints = null;
-}
-
-Composite.prototype.pin = function(index, pos) {
-  pos = pos || this.particles[index].pos;
-  var pc = new PinConstraint(this.particles[index], pos);
-  this.constraints.push(pc);
-  return pc;
-};
-
-module.exports = Composite;
-
-},{"./AABB":16}],12:[function(require,module,exports){
+},{"../structures/AABB":16,"../structures/Polygon":18,"../structures/Triangle":17,"../structures/Vec2":7}],15:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
 var Line = require("../structures/Line");
 var Triangle = require("../structures/Triangle");
@@ -1280,6 +1280,175 @@ A = Sin(A)* Sin(C) * b^2 / (Sin(B)*Sin(90))
 */
 
 },{"../structures/AABB":16,"../structures/Line":19,"../structures/Polygon":18,"../structures/Triangle":17,"../structures/Vec2":7}],20:[function(require,module,exports){
+/*
+
+The High level of this explanation is
+
+1) Each particle is defined as
+  (position + velocity*time)
+2) Using this, I can create a linear equation from two particles where...
+  m = (positionA.y + velocityA.y*time) - (positionB.y + velocityB.y*time)
+    / (positionA.x + velocityA.x*time) - (positionB.x + velocityB.x*time)
+  and
+  b = (positionA.y + velocityA.y*time) - (positionA.x + velocityA.x*time)*m
+
+3) Since I'm tring to find the exact time where a point is on a line, the equation
+    becomes
+  y = mx + b
+  (positionP.y + velocityP.y*time) = m*(positionP.x + velocityP.x*time) + b
+
+4) From here its about simplifying the equation until I get something solvable for time
+  I soon learned that the equation becomes a quadratic equation
+  a*time^2 + b*time + c
+
+4a)
+  as a result I can solve all the issue with
+  (-b (+||-) (b^2 - 4*a*c)^(1/2) ) / (2*a)
+
+4b) if a = 0, then the equation becomes even simpler
+  time = -c/b
+
+4c) if b is 0 and a is 0, we have nothing.
+
+5) However, The times I'm looking for are specific.
+
+5a) The time should be negative. I don't want to predict the future, I want to fix the past
+5b) The time cannot be larger than the current timestep. If it is, we are looking too far back
+5c) there may be a possibility that there are two times that fit our description.
+  as a result, we want to find the one that happened first. A simply Math.min works
+
+6) Return the value!
+
+*/
+
+
+module.exports.getImpacts = function(susP, lineA, lineB){
+
+  var vPsubvA = susP.vel.clone().sub(lineA.vel);
+  var vAsubvB = lineA.vel.clone().sub(lineB.vel);
+  var pPsubpA = susP.pos.clone().sub(lineA.pos);
+  var pAsubpB = lineA.pos.clone().sub(lineB.pos);
+
+  var a = vPsubvA.cross(vAsubvB);
+  var b = vPsubvA.cross(pAsubpB) + pPsubpA.cross(vAsubvB);
+  var c = pPsubpA.cross(pAsubpB);
+
+  if(a === 0){
+    //no need for quadratic
+    if(b === 0) return false;
+    return [-c/b];
+  }
+  var squared = Math.pow(b,2) - 4*a*c;
+  if(squared < 0){
+    return false;
+  }
+
+  if(squared === 0){
+    return [-b/(2*a)];
+  }
+  var minus = (-b - Math.sqrt(squared))/(2*a);
+  var plus = (-b + Math.sqrt(squared))/(2*a);
+
+
+
+  return [minus,plus];
+};
+
+module.exports.restrict = function(times, timestep){
+  var ret = false;
+  var l = times.length;
+  while(l--){
+    if(times[l] > 0) continue;
+    if(times[l] < -timestep) continue;
+    ret = Math.min(ret,times[l]);
+  }
+  return ret;
+};
+
+
+/*
+y = m*x+b
+m = (
+(time*velA.y + posA.y) - (time*velB.y + posB.y)
+/
+(time*velA.x + posA.x) - (time*velB.x + posB.x)
+)
+m = (
+time*(velA.y - velB.y) + (posA.y - posB.y)
+/
+time*(velA.x - velB.x) + (posA.x - posB.x)
+)
+b = y - m*x
+
+b = (time*velA.y + posA.y) - m*(time*velA.x + posA.x)
+
+y = mx + (time*velA.y + posA.y) - m*(time*velA.x + posA.x)
+y = m*(x - (time*velA.x + posA.x)) + (time*velA.y + posA.y)
+(y - (time*velA.y + posA.y))*( time*(velA.x - velB.x) + (posA.x - posB.x) )
+=
+(x - (time*velA.x + posA.x))*( time*(velA.y - velB.y) + (posA.y - posB.y) )
+
+net = (time*vel + pos)
+
+solve for time where x = (time*velP.x + posP.x) and y = (time*velP.y + posP.y)
+((time*velP.y + posP.y) - (time*velA.y + posA.y))
+*( time*(velA.x - velB.x) + (posA.x - posB.x) )
+=
+((time*velP.x + posP.x) - (time*velA.x + posA.x))
+*( time*(velA.y - velB.y) + (posA.y - posB.y) )
+
+( time*(velP.y - velA.y) + (posP.y - posA.y) )
+*( time*(velA.x - velB.x) + (posA.x - posB.x) )
+=
+( time*(velP.x - velA.x) + (posP.x - posA.x) )
+*( time*(velA.y - velB.y) + (posA.y - posB.y) )
+
+( time*time*(velP.y - velA.y)*(velA.x - velB.x))
++ time*(velP.y - velA.y)*(posA.x - posB.x)
++ time*(velA.x - velB.x)*(posP.y - posA.y)
++ (posP.y - posA.y)*(posA.x - posB.x)
+)
+=
+( time*time*(velP.x - velA.x)*(velA.y - velB.y)
++ time*(velP.x - velA.x)*(posA.y - posB.y)
++ time*(velA.y - velB.y)*(posP.x - posA.x)
++ (posP.x - posA.x)*(posA.y - posB.y)
+)
+0
+=
+time*time(
+(velP.x - velA.x)*(velA.y - velB.y)
+- (velP.y - velA.y)*(velA.x - velB.x)
+)
++ time*(
+(velP.x - velA.x)*(posA.y - posB.y)
++ (velA.y - velB.y)*(posP.x - posA.x)
+- (velP.y - velA.y)*(posA.x - posB.x)
+- (velA.x - velB.x)*(posP.y - posA.y)
+)
++ (posP.x - posA.x)*(posA.y - posB.y)
+- (posP.y - posA.y)*(posA.x - posB.x)
+
+0
+=
+time*time(
+(velP.x - velA.x)*(velA.y - velB.y)
+- (velP.y - velA.y)*(velA.x - velB.x)
+) //cross
++ time*(
+(velP.x - velA.x)*(posA.y - posB.y)
+- (velP.y - velA.y)*(posA.x - posB.x)
+//cross
++ (posP.x - posA.x)*(velA.y - velB.y)
+- (posP.y - posA.y)*(velA.x - velB.x)
+//cross
+)
++ (posP.x - posA.x)*(posA.y - posB.y)
+- (posP.y - posA.y)*(posA.x - posB.x)
+//cross
+*/
+
+},{}],21:[function(require,module,exports){
 
 function getLineMass(){
   console.log("need to get the net mass behind the line");
@@ -1289,6 +1458,14 @@ function getLineMass(){
 function getParticleMass(){
   console.log("need to get the net mass behind the particle");
   return 1;
+}
+
+function inelastic(){
+
+}
+
+function elastic(){
+
 }
 
 function distributeVelocities(p,a,b,time){
@@ -1303,6 +1480,13 @@ function distributeVelocities(p,a,b,time){
   var bp = b.pos.dist(p.pos);
   //  console.log("ap: "+(ap/ab));
   //  console.log("bp: "+(bp/ab));
+/*
+  alert(
+    "LineA{vel:"+a.vel+", pos:"+a.pos+"}\n"+
+    "LineB{vel:"+b.vel+", pos:"+b.pos+"}\n"+
+    "particle{vel:"+p.vel+", pos:"+p.pos+"}"
+  );
+  */
   var netv = a.vel.clone().scale(bp/ab).add(b.vel.clone().scale(ap/ab));
   //  console.log("avel: "+a.vel);
   //  console.log("bvel: "+b.vel);
@@ -1311,8 +1495,11 @@ function distributeVelocities(p,a,b,time){
 
   //  console.log("netv: "+netv);
   //now distributing momentum
-  netv
-  .scale(getLineMass())
+  p.vel.set(new Vec2(0,0));
+  a.vel.set(new Vec2(0,0));
+  b.vel.set(new Vec2(0,0));
+  /*
+  netv.scale(getLineMass())
   .add(p.vel.clone().scale(getParticleMass()))
   .scale(1/(getLineMass()+getParticleMass()));
 
@@ -1328,6 +1515,7 @@ function distributeVelocities(p,a,b,time){
   a.pos.add(a.vel.clone().scale(1-time));
   b.pos.add(b.vel.clone().scale(1-time));
   p.pos.add(p.vel.clone().scale(1-time));
+*/
 }
 
 module.exports.distributeVelocities = distributeVelocities;
@@ -1454,402 +1642,7 @@ AABB.prototype.intersectsCircle = function(c){
 
 module.exports = AABB;
 
-},{"./Line":19,"./Vec2":7}],18:[function(require,module,exports){
-function Polygon(oPoints){
-  var l = oPoints.length;
-  var i = l;
-  var points = Array(i);
-  while (i--) {
-    points[l-i-1] = oPoints[i].pos||oPoints[i];
-  }
-  for(var i in Polygon.prototype){
-    Object.defineProperty(points,i,{
-      enumerable: false,
-      value: Polygon.prototype[i].bind(points)
-    });
-  }
-  return points;
-}
-
-Polygon.prototype.clone = function(){
-  var points = this.slice(0);
-  for(var i in Polygon.prototype){
-    Object.defineProperty(points,i,{
-      enumerable: false,
-      value:Polygon.prototype[i].bind(points)
-    });
-  }
-  return points;
-}
-
-Polygon.prototype.forThree = function(fn,skip){
-  var l = this.length;
-  var i = l - (skip||0);
-  while(i--){
-    var prev = (i+1)%l;//((i == 0)?l:i) -1
-    var curr = i;
-    var next = (i+l-1)%l; //i == l-1?0:i+1
-    fn.call(this,this[prev],this[curr],this[next], curr);
-  }
-}
-
-var cachable = require("./cacheable");
-for(var i in cachable){
-  Polygon.prototype[i] = cachable[i]
-}
-var intersects = require("./intersects");
-for(var i in intersects){
-  Polygon.prototype[i] = intersects[i]
-}
-
-module.exports = Polygon;
-
-},{"./cacheable":21,"./intersects":22}],23:[function(require,module,exports){
-/*
-
-The High level of this explanation is
-
-1) Each particle is defined as
-  (position + velocity*time)
-2) Using this, I can create a linear equation from two particles where...
-  m = (positionA.y + velocityA.y*time) - (positionB.y + velocityB.y*time)
-    / (positionA.x + velocityA.x*time) - (positionB.x + velocityB.x*time)
-  and
-  b = (positionA.y + velocityA.y*time) - (positionA.x + velocityA.x*time)*m
-
-3) Since I'm tring to find the exact time where a point is on a line, the equation
-    becomes
-  y = mx + b
-  (positionP.y + velocityP.y*time) = m*(positionP.x + velocityP.x*time) + b
-
-4) From here its about simplifying the equation until I get something solvable for time
-  I soon learned that the equation becomes a quadratic equation
-  a*time^2 + b*time + c
-
-4a)
-  as a result I can solve all the issue with
-  (-b (+||-) (b^2 - 4*a*c)^(1/2) ) / (2*a)
-
-4b) if a = 0, then the equation becomes even simpler
-  time = -c/b
-
-4c) if b is 0 and a is 0, we have nothing.
-
-5) However, The times I'm looking for are specific.
-
-5a) The time should be negative. I don't want to predict the future, I want to fix the past
-5b) The time cannot be larger than the current timestep. If it is, we are looking too far back
-5c) there may be a possibility that there are two times that fit our description.
-  as a result, we want to find the one that happened first. A simply Math.min works
-
-6) Return the value!
-
-*/
-
-
-module.exports.getImpacts = function(susP, lineA, lineB){
-
-  var vPsubvA = susP.vel.clone().sub(lineA.vel);
-  var vAsubvB = lineA.vel.clone().sub(lineB.vel);
-  var pPsubpA = susP.pos.clone().sub(lineA.pos);
-  var pAsubpB = lineA.pos.clone().sub(lineB.pos);
-
-  var a = vPsubvA.cross(vAsubvB);
-  var b = vPsubvA.cross(pAsubpB) + pPsubpA.cross(vAsubvB);
-  var c = pPsubpA.cross(pAsubpB);
-
-  if(a === 0){
-    //no need for quadratic
-    if(b === 0) return false;
-    return [-c/b];
-  }
-  var squared = Math.pow(b,2) - 4*a*c;
-  if(squared < 0){
-    return false;
-  }
-
-  if(squared === 0){
-    return [-b/(2*a)];
-  }
-  var minus = (-b - Math.sqrt(squared))/(2*a);
-  var plus = (-b + Math.sqrt(squared))/(2*a);
-
-
-
-  return [minus,plus];
-};
-
-module.exports.restrict = function(times, timestep){
-  var ret = false;
-  var l = times.length;
-  while(l--){
-    if(times[l] > 0) continue;
-    if(times[l] < -timestep) continue;
-    ret = Math.min(ret,times[l]);
-  }
-  return ret;
-};
-
-
-/*
-y = mx+b
-m = (
-(time*velA.y + posA.y) - (time*velB.y + posB.y)
-/
-(time*velA.x + posA.x) - (time*velB.x + posB.x)
-)
-m = (
-time*(velA.y - velB.y) + (posA.y - posB.y)
-/
-time*(velA.x - velB.x) + (posA.x - posB.x)
-)
-b = y - mx
-b = (time*velA.y + posA.y) - m*(time*velA.x + posA.x)
-
-y = mx + (time*velA.y + posA.y) - m*(time*velA.x + posA.x)
-y = m*(x - (time*velA.x + posA.x)) + (time*velA.y + posA.y)
-(y - (time*velA.y + posA.y))*( time*(velA.x - velB.x) + (posA.x - posB.x) )
-=
-(x - (time*velA.x + posA.x))*( time*(velA.y - velB.y) + (posA.y - posB.y) )
-
-net = (time*vel + pos)
-
-solve for time where x = (time*velP.x + posP.x) and y = (time*velP.y + posP.y)
-((time*velP.y + posP.y) - (time*velA.y + posA.y))
-*( time*(velA.x - velB.x) + (posA.x - posB.x) )
-=
-((time*velP.x + posP.x) - (time*velA.x + posA.x))
-*( time*(velA.y - velB.y) + (posA.y - posB.y) )
-
-( time*(velP.y - velA.y) + (posP.y - posA.y) )
-*( time*(velA.x - velB.x) + (posA.x - posB.x) )
-=
-( time*(velP.x - velA.x) + (posP.x - posA.x) )
-*( time*(velA.y - velB.y) + (posA.y - posB.y) )
-
-( time*time*(velP.y - velA.y)*(velA.x - velB.x))
-+ time*(velP.y - velA.y)*(posA.x - posB.x)
-+ time*(velA.x - velB.x)*(posP.y - posA.y)
-+ (posP.y - posA.y)*(posA.x - posB.x)
-)
-=
-( time*time*(velP.x - velA.x)*(velA.y - velB.y)
-+ time*(velP.x - velA.x)*(posA.y - posB.y)
-+ time*(velA.y - velB.y)*(posP.x - posA.x)
-+ (posP.x - posA.x)*(posA.y - posB.y)
-)
-0
-=
-time*time(
-(velP.x - velA.x)*(velA.y - velB.y)
-- (velP.y - velA.y)*(velA.x - velB.x)
-)
-+ time*(
-(velP.x - velA.x)*(posA.y - posB.y)
-+ (velA.y - velB.y)*(posP.x - posA.x)
-- (velP.y - velA.y)*(posA.x - posB.x)
-- (velA.x - velB.x)*(posP.y - posA.y)
-)
-+ (posP.x - posA.x)*(posA.y - posB.y)
-- (posP.y - posA.y)*(posA.x - posB.x)
-
-0
-=
-time*time(
-(velP.x - velA.x)*(velA.y - velB.y)
-- (velP.y - velA.y)*(velA.x - velB.x)
-) //cross
-+ time*(
-(velP.x - velA.x)*(posA.y - posB.y)
-- (velP.y - velA.y)*(posA.x - posB.x)
-//cross
-+ (posP.x - posA.x)*(velA.y - velB.y)
-- (posP.y - posA.y)*(velA.x - velB.x)
-//cross
-)
-+ (posP.x - posA.x)*(posA.y - posB.y)
-- (posP.y - posA.y)*(posA.x - posB.x)
-//cross
-*/
-
-},{}],17:[function(require,module,exports){
-var Vec2 = require("../Vec2");
-var Line = require("../Line");
-
-
-function Triangle(A,B,C){
-  if(A.equals(B) || B.equals(C) || C.equals(A))
-    throw new Error("cannot create triangle when two points are the same")
-  this.A = A;
-  this.B = B;
-  this.C = C;
-  this.AB = new Line(A,B);
-  this.BC = new Line(B,C);
-  this.CA = new Line(C,A);
-  this.ABC = Math.lawCos(this.CA.length, this.AB.length, this.BC.length);
-  this.BCA = Math.asin(Math.sin(this.ABC)*this.CA.length/this.AB.length);
-  this.CAB = Math.asin(Math.sin(this.ABC)*this.BC.length/this.AB.length);
-  this.perimiter = this.AB.length + this.BC.length + this.CA.length
-  this.partialArea = this.AB.cross + this.BC.cross + this.CA.cross
-  this.area = Math.abs(this.partialArea);
-}
-
-
-var interesctions = require("./intersects.js");
-
-for(var i in interesctions){
-  Triangle.prototype[i] = interesctions[i];
-}
-
-var questions = require("./questions.js");
-
-for(var i in questions){
-  Triangle.prototype[i] = questions[i];
-}
-
-var cacheable = require("./cacheable.js");
-
-Triangle.prototype.getConcaveBisector = cacheable.getConcaveBisector;
-
-
-module.exports = Triangle;
-
-},{"../Line":19,"../Vec2":7,"./cacheable.js":26,"./intersects.js":24,"./questions.js":25}],26:[function(require,module,exports){
-var Triangle = {};
-
-Triangle.getConcaveBisector = function(){
-  return this.CA.perpendicularBisector();
-}
-Triangle.AB = function(){
-  return new Line(this.A,this.B);
-}
-Triangle.BC = function(){
-  return new Line(B,C);
-}
-Triangle.CA = function(){
-  return new Line(C,A);
-}
-Triangle.ABC = function(){
-  return Math.lawCos(this.CA.length, this.AB.length, this.BC.length);
-}
-Triangle.BCA = function(){
-  return Math.asin(Math.sin(this.ABC)*this.CA.length/this.AB.length);
-}
-Triangle.CAB = function(){
-  return Math.asin(Math.sin(this.ABC)*this.BC.length/this.AB.length);
-}
-Triangle.perimiter = function(){
-  return this.AB.length + this.BC.length + this.CA.length
-}
-Triangle.partialArea = function(){
-  return this.AB.cross + this.BC.cross + this.CA.cross
-}
-Triangle.area = function(){
-  return Math.abs(this.partialArea);
-}
-
-module.exports = Triangle;
-
-},{}],24:[function(require,module,exports){
-var Triangle = {};
-
-Triangle.hasPoint = function(point){
-  //http://www.blackpawn.com/texts/pointinpoly/
-  // Compute vectors
-  var v0 = this.C.clone().sub(this.B);
-  var v1 = this.A.clone().sub(this.B);
-  var v2 = point.clone().sub(this.B);
-
-  // Compute dot products
-  var dot00 = v0.dot(v0);
-  var dot01 = v0.dot(v1);
-  var dot02 = v0.dot(v2);
-  var dot11 = v1.dot(v1);
-  var dot12 = v1.dot(v2);
-
-  // Compute barycentric coordinates
-  var invDenom = 1 / (dot00 * dot11 - dot01 * dot01)
-  var u = (dot11 * dot02 - dot01 * dot12) * invDenom
-  var v = (dot00 * dot12 - dot01 * dot02) * invDenom
-
-  // Check if point is in triangle
-  return (u >= 0) && (v >= 0) && (u + v < 1)
-}
-
-module.exports = Triangle;
-
-},{}],25:[function(require,module,exports){
-
-var Triangle = {};
-
-var sqrt2 = Math.pow(2,1/2);
-
-Triangle.isConcave = function(a,b,c){
-  //rotate the points around B to make B and A parrallel to the X axis
-  //If the line BC is negative, it is Concave
-  //If the line BC is positive, it is Convex
-  var ac = new Line(a,c);
-  //  A should always be rotated -PI/2
-  return ac.pointIsLeftOrTop(ac.perpendicularBisector().A)
-    == ac.pointIsLeftOrTop(b);
-  // return Math.sign(p.x) == Math.sign(b.x) && Math.sign(p.y) == Math.sign(b.y);
-}
-
-Triangle.anglePrimer = function(){
-  return this.CA.length - sqrt2*(this.AB.length+this.BC.length)/2;
-}
-
-Triangle.isAcute = function(){
-  return this.anglePrimer() < 0;
-}
-
-Triangle.isObtuse = function(){
-  return this.anglePrimer() > 0;
-}
-
-Triangle.isRight = function(){
-  return this.anglePrimer() == 0;
-}
-
-Triangle.equals = function(tri){
-  return this.A.equals(tri.A)
-  && this.B.equals(tri.B)
-  && this.C.equals(tri.C);
-}
-
-Triangle.epsilonEquals = function(tri, epsilon) {
-  return this.A.epsilonEquals(tri.A,epsilon)
-  && this.B.epsilonEquals(tri.B,epsilon)
-  && this.C.epsilonEquals(tri.C,epsilon);
-}
-
-Triangle.equalShape = function(tri) {
-  return this.area == tri.area && this.perimiter == tri.perimiter
-}
-
-Triangle.epsilonEqualShape = function(tri,epsilon) {
-  return Math.abs(this.area - tri.area)/27 <= epsilon
-  && Math.abs(this.perimiter - tri.perimiter)/9 <= epsilon;
-}
-
-Triangle.equalAngles = function(tri) {
-  var keys = ["ABC","BCA", "CAB"];
-  var i = 3;
-  var j;
-  while(i--){
-    j = 3;
-    while(j--){
-      if(this[keys[i]] == tri[keys[i]]) break;
-    }
-    if(j < 0) return false;
-  }
-  return true;
-}
-
-
-module.exports = Triangle;
-
-},{}],19:[function(require,module,exports){
+},{"./Line":19,"./Vec2":7}],19:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 
 
@@ -1916,43 +1709,7 @@ Line.prototype.getXValue = function(y){
 
 module.exports = Line;
 
-},{"../Vec2":7,"./intersects.js":27,"./questions.js":28}],21:[function(require,module,exports){
-var Vec2 = require("../Vec2");
-
-
-var Polygon = {};
-
-Polygon.getMidPoint = function(){
-  var l = this.length;
-  var mid = new Vec2();
-  for(var i=this.length;i--;){
-    mid.add(this[i].clone().scale(1/l));
-  };
-  return mid;
-}
-
-Polygon.getArea = function(){
-  var net = 0;
-  //http://www.wikihow.com/Calculate-the-Area-of-a-Polygon
-  this.forThree(function(a,b,c){
-    net += b.cross(c);
-  })
-  return net;
-}
-
-Polygon.getAABB = function(){
-  var max = new Vec2(Number.NEGATIVE_INFINITY,Number.NEGATIVE_INFINITY);
-  var min = new Vec2(Number.POSITIVE_INFINITY,Number.POSITIVE_INFINITY);
-  for(var i=this.length;i--;){
-    max.max(this[i]);
-    min.min(this[i]);
-  }
-  return {max:max,min:min};
-}
-
-module.exports = Polygon
-
-},{"../Vec2":7}],13:[function(require,module,exports){
+},{"../Vec2":7,"./intersects.js":22,"./questions.js":23}],8:[function(require,module,exports){
 var AABB = require("../structures/AABB");
 var Line = require("../structures/Line");
 var boxIntersect = require("box-intersect");
@@ -2037,7 +1794,57 @@ function runCollision(p,a,b,timestep){
 
 module.exports = toExport;
 
-},{"../structures/AABB":16,"../structures/Line":19,"./momentum":20,"./time":23,"box-intersect":29}],28:[function(require,module,exports){
+},{"../structures/AABB":16,"../structures/Line":19,"./momentum":21,"./time":20,"box-intersect":24}],18:[function(require,module,exports){
+function Polygon(oPoints){
+  var l = oPoints.length;
+  var i = l;
+  var points = Array(i);
+  while (i--) {
+    points[l-i-1] = oPoints[i].pos||oPoints[i];
+  }
+  for(var i in Polygon.prototype){
+    Object.defineProperty(points,i,{
+      enumerable: false,
+      value: Polygon.prototype[i].bind(points)
+    });
+  }
+  return points;
+}
+
+Polygon.prototype.clone = function(){
+  var points = this.slice(0);
+  for(var i in Polygon.prototype){
+    Object.defineProperty(points,i,{
+      enumerable: false,
+      value:Polygon.prototype[i].bind(points)
+    });
+  }
+  return points;
+}
+
+Polygon.prototype.forThree = function(fn,skip){
+  var l = this.length;
+  var i = l - (skip||0);
+  while(i--){
+    var prev = (i+1)%l;//((i == 0)?l:i) -1
+    var curr = i;
+    var next = (i+l-1)%l; //i == l-1?0:i+1
+    fn.call(this,this[prev],this[curr],this[next], curr);
+  }
+}
+
+var cachable = require("./cacheable");
+for(var i in cachable){
+  Polygon.prototype[i] = cachable[i]
+}
+var intersects = require("./intersects");
+for(var i in intersects){
+  Polygon.prototype[i] = intersects[i]
+}
+
+module.exports = Polygon;
+
+},{"./cacheable":26,"./intersects":25}],23:[function(require,module,exports){
 var Line = {};
 
 Line.equals = function(line){
@@ -2075,7 +1882,184 @@ Line.epsilonEqualMagnitude = function(line, epsilon) {
 
 module.exports =  Line;
 
-},{}],27:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
+var Vec2 = require("../Vec2");
+var Line = require("../Line");
+
+
+function Triangle(A,B,C){
+  if(A.equals(B) || B.equals(C) || C.equals(A))
+    throw new Error("cannot create triangle when two points are the same")
+  this.A = A;
+  this.B = B;
+  this.C = C;
+  this.AB = new Line(A,B);
+  this.BC = new Line(B,C);
+  this.CA = new Line(C,A);
+  this.ABC = Math.lawCos(this.CA.length, this.AB.length, this.BC.length);
+  this.BCA = Math.asin(Math.sin(this.ABC)*this.CA.length/this.AB.length);
+  this.CAB = Math.asin(Math.sin(this.ABC)*this.BC.length/this.AB.length);
+  this.perimiter = this.AB.length + this.BC.length + this.CA.length
+  this.partialArea = this.AB.cross + this.BC.cross + this.CA.cross
+  this.area = Math.abs(this.partialArea);
+}
+
+
+var interesctions = require("./intersects.js");
+
+for(var i in interesctions){
+  Triangle.prototype[i] = interesctions[i];
+}
+
+var questions = require("./questions.js");
+
+for(var i in questions){
+  Triangle.prototype[i] = questions[i];
+}
+
+var cacheable = require("./cacheable.js");
+
+Triangle.prototype.getConcaveBisector = cacheable.getConcaveBisector;
+
+
+module.exports = Triangle;
+
+},{"../Line":19,"../Vec2":7,"./cacheable.js":29,"./intersects.js":27,"./questions.js":28}],27:[function(require,module,exports){
+var Triangle = {};
+
+Triangle.hasPoint = function(point){
+  //http://www.blackpawn.com/texts/pointinpoly/
+  // Compute vectors
+  var v0 = this.C.clone().sub(this.B);
+  var v1 = this.A.clone().sub(this.B);
+  var v2 = point.clone().sub(this.B);
+
+  // Compute dot products
+  var dot00 = v0.dot(v0);
+  var dot01 = v0.dot(v1);
+  var dot02 = v0.dot(v2);
+  var dot11 = v1.dot(v1);
+  var dot12 = v1.dot(v2);
+
+  // Compute barycentric coordinates
+  var invDenom = 1 / (dot00 * dot11 - dot01 * dot01)
+  var u = (dot11 * dot02 - dot01 * dot12) * invDenom
+  var v = (dot00 * dot12 - dot01 * dot02) * invDenom
+
+  // Check if point is in triangle
+  return (u >= 0) && (v >= 0) && (u + v < 1)
+}
+
+module.exports = Triangle;
+
+},{}],28:[function(require,module,exports){
+
+var Triangle = {};
+
+var sqrt2 = Math.pow(2,1/2);
+
+Triangle.isConcave = function(a,b,c){
+  //rotate the points around B to make B and A parrallel to the X axis
+  //If the line BC is negative, it is Concave
+  //If the line BC is positive, it is Convex
+  var ac = new Line(a,c);
+  //  A should always be rotated -PI/2
+  return ac.pointIsLeftOrTop(ac.perpendicularBisector().A)
+    == ac.pointIsLeftOrTop(b);
+  // return Math.sign(p.x) == Math.sign(b.x) && Math.sign(p.y) == Math.sign(b.y);
+}
+
+Triangle.anglePrimer = function(){
+  return this.CA.length - sqrt2*(this.AB.length+this.BC.length)/2;
+}
+
+Triangle.isAcute = function(){
+  return this.anglePrimer() < 0;
+}
+
+Triangle.isObtuse = function(){
+  return this.anglePrimer() > 0;
+}
+
+Triangle.isRight = function(){
+  return this.anglePrimer() == 0;
+}
+
+Triangle.equals = function(tri){
+  return this.A.equals(tri.A)
+  && this.B.equals(tri.B)
+  && this.C.equals(tri.C);
+}
+
+Triangle.epsilonEquals = function(tri, epsilon) {
+  return this.A.epsilonEquals(tri.A,epsilon)
+  && this.B.epsilonEquals(tri.B,epsilon)
+  && this.C.epsilonEquals(tri.C,epsilon);
+}
+
+Triangle.equalShape = function(tri) {
+  return this.area == tri.area && this.perimiter == tri.perimiter
+}
+
+Triangle.epsilonEqualShape = function(tri,epsilon) {
+  return Math.abs(this.area - tri.area)/27 <= epsilon
+  && Math.abs(this.perimiter - tri.perimiter)/9 <= epsilon;
+}
+
+Triangle.equalAngles = function(tri) {
+  var keys = ["ABC","BCA", "CAB"];
+  var i = 3;
+  var j;
+  while(i--){
+    j = 3;
+    while(j--){
+      if(this[keys[i]] == tri[keys[i]]) break;
+    }
+    if(j < 0) return false;
+  }
+  return true;
+}
+
+
+module.exports = Triangle;
+
+},{}],29:[function(require,module,exports){
+var Triangle = {};
+
+Triangle.getConcaveBisector = function(){
+  return this.CA.perpendicularBisector();
+}
+Triangle.AB = function(){
+  return new Line(this.A,this.B);
+}
+Triangle.BC = function(){
+  return new Line(B,C);
+}
+Triangle.CA = function(){
+  return new Line(C,A);
+}
+Triangle.ABC = function(){
+  return Math.lawCos(this.CA.length, this.AB.length, this.BC.length);
+}
+Triangle.BCA = function(){
+  return Math.asin(Math.sin(this.ABC)*this.CA.length/this.AB.length);
+}
+Triangle.CAB = function(){
+  return Math.asin(Math.sin(this.ABC)*this.BC.length/this.AB.length);
+}
+Triangle.perimiter = function(){
+  return this.AB.length + this.BC.length + this.CA.length
+}
+Triangle.partialArea = function(){
+  return this.AB.cross + this.BC.cross + this.CA.cross
+}
+Triangle.area = function(){
+  return Math.abs(this.partialArea);
+}
+
+module.exports = Triangle;
+
+},{}],22:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = {};
 
@@ -2130,49 +2114,43 @@ Line.intersectsPoint = function(p){
 
 module.exports = Line;
 
-},{"../Vec2":7}],22:[function(require,module,exports){
-var AABB = require("../AABB")
-var Line = require("../Line");
+},{"../Vec2":7}],26:[function(require,module,exports){
+var Vec2 = require("../Vec2");
+
+
 var Polygon = {};
 
-Polygon.intersectsLine = function(line,skip){
-  //creating smaller aabbs
-  //We're going to detect intersection by slope
-  //however, the point of intersection may be outside of the of the possible area
-  //as a result we're creating a smaller aabb thats the maxes and minimums of the current area
-
-  var tAABB = new AABB(line.A,line.B);
-
-  var intersections = [];
-
-  this.forThree(function(oprev,ocurr,onext){
-    if(line.A == ocurr) return;
-    if(line.B == oprev) return;
-    if(oprev == line.A) return;
-    var oAABB = new AABB(oprev,ocurr);
-
-    if(!tAABB.intersectsAABB(oAABB)) return;
-
-    //I would like to cache the oprev->ocurr line if possible
-    //I would also prefer searching only for lines with the appropiate AABBs
-    var intersect = line.intersectsLine(new Line(oprev,ocurr));
-    if(!intersect) return;
-
-    var netAABB = {
-      max: oAABB.max.min(tAABB.max),
-      min: oAABB.min.max(tAABB.min)
-    };
-    //If intersect point isn't between the two points, this isn't for us.
-    if(!tAABB.containsPoint(intersect)) return;
-
-    intersections.push(intersect);
-
-  },skip);
-  return intersections;
+Polygon.getMidPoint = function(){
+  var l = this.length;
+  var mid = new Vec2();
+  for(var i=this.length;i--;){
+    mid.add(this[i].clone().scale(1/l));
+  };
+  return mid;
 }
-module.exports = Polygon;
 
-},{"../AABB":16,"../Line":19}],29:[function(require,module,exports){
+Polygon.getArea = function(){
+  var net = 0;
+  //http://www.wikihow.com/Calculate-the-Area-of-a-Polygon
+  this.forThree(function(a,b,c){
+    net += b.cross(c);
+  })
+  return net;
+}
+
+Polygon.getAABB = function(){
+  var max = new Vec2(Number.NEGATIVE_INFINITY,Number.NEGATIVE_INFINITY);
+  var min = new Vec2(Number.POSITIVE_INFINITY,Number.POSITIVE_INFINITY);
+  for(var i=this.length;i--;){
+    max.max(this[i]);
+    min.min(this[i]);
+  }
+  return {max:max,min:min};
+}
+
+module.exports = Polygon
+
+},{"../Vec2":7}],24:[function(require,module,exports){
 'use strict'
 
 module.exports = boxIntersectWrapper
@@ -2301,7 +2279,49 @@ function boxIntersectWrapper(arg0, arg1, arg2) {
       throw new Error('box-intersect: Invalid arguments')
   }
 }
-},{"./lib/intersect":31,"./lib/sweep":30,"typedarray-pool":32}],33:[function(require,module,exports){
+},{"./lib/intersect":31,"./lib/sweep":30,"typedarray-pool":32}],25:[function(require,module,exports){
+var AABB = require("../AABB")
+var Line = require("../Line");
+var Polygon = {};
+
+Polygon.intersectsLine = function(line,skip){
+  //creating smaller aabbs
+  //We're going to detect intersection by slope
+  //however, the point of intersection may be outside of the of the possible area
+  //as a result we're creating a smaller aabb thats the maxes and minimums of the current area
+
+  var tAABB = new AABB(line.A,line.B);
+
+  var intersections = [];
+
+  this.forThree(function(oprev,ocurr,onext){
+    if(line.A == ocurr) return;
+    if(line.B == oprev) return;
+    if(oprev == line.A) return;
+    var oAABB = new AABB(oprev,ocurr);
+
+    if(!tAABB.intersectsAABB(oAABB)) return;
+
+    //I would like to cache the oprev->ocurr line if possible
+    //I would also prefer searching only for lines with the appropiate AABBs
+    var intersect = line.intersectsLine(new Line(oprev,ocurr));
+    if(!intersect) return;
+
+    var netAABB = {
+      max: oAABB.max.min(tAABB.max),
+      min: oAABB.min.max(tAABB.min)
+    };
+    //If intersect point isn't between the two points, this isn't for us.
+    if(!tAABB.containsPoint(intersect)) return;
+
+    intersections.push(intersect);
+
+  },skip);
+  return intersections;
+}
+module.exports = Polygon;
+
+},{"../AABB":16,"../Line":19}],33:[function(require,module,exports){
 'use strict';
 
 //This code is extracted from ndarray-sort
@@ -2704,7 +2724,443 @@ function genPartition(predicate, args) {
         .replace('$', predicate))
   return Function.apply(void 0, fargs)
 }
-},{}],31:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
+(function(){'use strict'
+
+module.exports = {
+  init:           sqInit,
+  sweepBipartite: sweepBipartite,
+  sweepComplete:  sweepComplete,
+  scanBipartite:  scanBipartite,
+  scanComplete:   scanComplete
+}
+
+var pool  = require('typedarray-pool')
+var bits  = require('bit-twiddle')
+var isort = require('./sort')
+
+//Flag for blue
+var BLUE_FLAG = (1<<28)
+
+//1D sweep event queue stuff (use pool to save space)
+var INIT_CAPACITY      = 1024
+var RED_SWEEP_QUEUE    = pool.mallocInt32(INIT_CAPACITY)
+var RED_SWEEP_INDEX    = pool.mallocInt32(INIT_CAPACITY)
+var BLUE_SWEEP_QUEUE   = pool.mallocInt32(INIT_CAPACITY)
+var BLUE_SWEEP_INDEX   = pool.mallocInt32(INIT_CAPACITY)
+var COMMON_SWEEP_QUEUE = pool.mallocInt32(INIT_CAPACITY)
+var COMMON_SWEEP_INDEX = pool.mallocInt32(INIT_CAPACITY)
+var SWEEP_EVENTS       = pool.mallocDouble(INIT_CAPACITY * 8)
+
+//Reserves memory for the 1D sweep data structures
+function sqInit(count) {
+  var rcount = bits.nextPow2(count)
+  if(RED_SWEEP_QUEUE.length < rcount) {
+    pool.free(RED_SWEEP_QUEUE)
+    RED_SWEEP_QUEUE = pool.mallocInt32(rcount)
+  }
+  if(RED_SWEEP_INDEX.length < rcount) {
+    pool.free(RED_SWEEP_INDEX)
+    RED_SWEEP_INDEX = pool.mallocInt32(rcount)
+  }
+  if(BLUE_SWEEP_QUEUE.length < rcount) {
+    pool.free(BLUE_SWEEP_QUEUE)
+    BLUE_SWEEP_QUEUE = pool.mallocInt32(rcount)
+  }
+  if(BLUE_SWEEP_INDEX.length < rcount) {
+    pool.free(BLUE_SWEEP_INDEX)
+    BLUE_SWEEP_INDEX = pool.mallocInt32(rcount)
+  }
+  if(COMMON_SWEEP_QUEUE.length < rcount) {
+    pool.free(COMMON_SWEEP_QUEUE)
+    COMMON_SWEEP_QUEUE = pool.mallocInt32(rcount)
+  }
+  if(COMMON_SWEEP_INDEX.length < rcount) {
+    pool.free(COMMON_SWEEP_INDEX)
+    COMMON_SWEEP_INDEX = pool.mallocInt32(rcount)
+  }
+  var eventLength = 8 * rcount
+  if(SWEEP_EVENTS.length < eventLength) {
+    pool.free(SWEEP_EVENTS)
+    SWEEP_EVENTS = pool.mallocDouble(eventLength)
+  }
+}
+
+//Remove an item from the active queue in O(1)
+function sqPop(queue, index, count, item) {
+  var idx = index[item]
+  var top = queue[count-1]
+  queue[idx] = top
+  index[top] = idx
+}
+
+//Insert an item into the active queue in O(1)
+function sqPush(queue, index, count, item) {
+  queue[count] = item
+  index[item]  = count
+}
+
+//Recursion base case: use 1D sweep algorithm
+function sweepBipartite(
+    d, visit,
+    redStart,  redEnd, red, redIndex,
+    blueStart, blueEnd, blue, blueIndex) {
+
+  //store events as pairs [coordinate, idx]
+  //
+  //  red create:  -(idx+1)
+  //  red destroy: idx
+  //  blue create: -(idx+BLUE_FLAG)
+  //  blue destroy: idx+BLUE_FLAG
+  //
+  var ptr      = 0
+  var elemSize = 2*d
+  var istart   = d-1
+  var iend     = elemSize-1
+
+  for(var i=redStart; i<redEnd; ++i) {
+    var idx = redIndex[i]
+    var redOffset = elemSize*i
+    SWEEP_EVENTS[ptr++] = red[redOffset+istart]
+    SWEEP_EVENTS[ptr++] = -(idx+1)
+    SWEEP_EVENTS[ptr++] = red[redOffset+iend]
+    SWEEP_EVENTS[ptr++] = idx
+  }
+
+  for(var i=blueStart; i<blueEnd; ++i) {
+    var idx = blueIndex[i]+BLUE_FLAG
+    var blueOffset = elemSize*i
+    SWEEP_EVENTS[ptr++] = blue[blueOffset+istart]
+    SWEEP_EVENTS[ptr++] = -idx
+    SWEEP_EVENTS[ptr++] = blue[blueOffset+iend]
+    SWEEP_EVENTS[ptr++] = idx
+  }
+
+  //process events from left->right
+  var n = ptr >>> 1
+  isort(SWEEP_EVENTS, n)
+  
+  var redActive  = 0
+  var blueActive = 0
+  for(var i=0; i<n; ++i) {
+    var e = SWEEP_EVENTS[2*i+1]|0
+    if(e >= BLUE_FLAG) {
+      //blue destroy event
+      e = (e-BLUE_FLAG)|0
+      sqPop(BLUE_SWEEP_QUEUE, BLUE_SWEEP_INDEX, blueActive--, e)
+    } else if(e >= 0) {
+      //red destroy event
+      sqPop(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive--, e)
+    } else if(e <= -BLUE_FLAG) {
+      //blue create event
+      e = (-e-BLUE_FLAG)|0
+      for(var j=0; j<redActive; ++j) {
+        var retval = visit(RED_SWEEP_QUEUE[j], e)
+        if(retval !== void 0) {
+          return retval
+        }
+      }
+      sqPush(BLUE_SWEEP_QUEUE, BLUE_SWEEP_INDEX, blueActive++, e)
+    } else {
+      //red create event
+      e = (-e-1)|0
+      for(var j=0; j<blueActive; ++j) {
+        var retval = visit(e, BLUE_SWEEP_QUEUE[j])
+        if(retval !== void 0) {
+          return retval
+        }
+      }
+      sqPush(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive++, e)
+    }
+  }
+}
+
+//Complete sweep
+function sweepComplete(d, visit, 
+  redStart, redEnd, red, redIndex,
+  blueStart, blueEnd, blue, blueIndex) {
+
+  var ptr      = 0
+  var elemSize = 2*d
+  var istart   = d-1
+  var iend     = elemSize-1
+
+  for(var i=redStart; i<redEnd; ++i) {
+    var idx = (redIndex[i]+1)<<1
+    var redOffset = elemSize*i
+    SWEEP_EVENTS[ptr++] = red[redOffset+istart]
+    SWEEP_EVENTS[ptr++] = -idx
+    SWEEP_EVENTS[ptr++] = red[redOffset+iend]
+    SWEEP_EVENTS[ptr++] = idx
+  }
+
+  for(var i=blueStart; i<blueEnd; ++i) {
+    var idx = (blueIndex[i]+1)<<1
+    var blueOffset = elemSize*i
+    SWEEP_EVENTS[ptr++] = blue[blueOffset+istart]
+    SWEEP_EVENTS[ptr++] = (-idx)|1
+    SWEEP_EVENTS[ptr++] = blue[blueOffset+iend]
+    SWEEP_EVENTS[ptr++] = idx|1
+  }
+
+  //process events from left->right
+  var n = ptr >>> 1
+  isort(SWEEP_EVENTS, n)
+  
+  var redActive    = 0
+  var blueActive   = 0
+  var commonActive = 0
+  for(var i=0; i<n; ++i) {
+    var e     = SWEEP_EVENTS[2*i+1]|0
+    var color = e&1
+    if(i < n-1 && (e>>1) === (SWEEP_EVENTS[2*i+3]>>1)) {
+      color = 2
+      i += 1
+    }
+    
+    if(e < 0) {
+      //Create event
+      var id = -(e>>1) - 1
+
+      //Intersect with common
+      for(var j=0; j<commonActive; ++j) {
+        var retval = visit(COMMON_SWEEP_QUEUE[j], id)
+        if(retval !== void 0) {
+          return retval
+        }
+      }
+
+      if(color !== 0) {
+        //Intersect with red
+        for(var j=0; j<redActive; ++j) {
+          var retval = visit(RED_SWEEP_QUEUE[j], id)
+          if(retval !== void 0) {
+            return retval
+          }
+        }
+      }
+
+      if(color !== 1) {
+        //Intersect with blue
+        for(var j=0; j<blueActive; ++j) {
+          var retval = visit(BLUE_SWEEP_QUEUE[j], id)
+          if(retval !== void 0) {
+            return retval
+          }
+        }
+      }
+
+      if(color === 0) {
+        //Red
+        sqPush(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive++, id)
+      } else if(color === 1) {
+        //Blue
+        sqPush(BLUE_SWEEP_QUEUE, BLUE_SWEEP_INDEX, blueActive++, id)
+      } else if(color === 2) {
+        //Both
+        sqPush(COMMON_SWEEP_QUEUE, COMMON_SWEEP_INDEX, commonActive++, id)
+      }
+    } else {
+      //Destroy event
+      var id = (e>>1) - 1
+      if(color === 0) {
+        //Red
+        sqPop(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive--, id)
+      } else if(color === 1) {
+        //Blue
+        sqPop(BLUE_SWEEP_QUEUE, BLUE_SWEEP_INDEX, blueActive--, id)
+      } else if(color === 2) {
+        //Both
+        sqPop(COMMON_SWEEP_QUEUE, COMMON_SWEEP_INDEX, commonActive--, id)
+      }
+    }
+  }
+}
+
+//Sweep and prune/scanline algorithm:
+//  Scan along axis, detect intersections
+//  Brute force all boxes along axis
+function scanBipartite(
+  d, axis, visit, flip,
+  redStart,  redEnd, red, redIndex,
+  blueStart, blueEnd, blue, blueIndex) {
+  
+  var ptr      = 0
+  var elemSize = 2*d
+  var istart   = axis
+  var iend     = axis+d
+
+  var redShift  = 1
+  var blueShift = 1
+  if(flip) {
+    blueShift = BLUE_FLAG
+  } else {
+    redShift  = BLUE_FLAG
+  }
+
+  for(var i=redStart; i<redEnd; ++i) {
+    var idx = i + redShift
+    var redOffset = elemSize*i
+    SWEEP_EVENTS[ptr++] = red[redOffset+istart]
+    SWEEP_EVENTS[ptr++] = -idx
+    SWEEP_EVENTS[ptr++] = red[redOffset+iend]
+    SWEEP_EVENTS[ptr++] = idx
+  }
+  for(var i=blueStart; i<blueEnd; ++i) {
+    var idx = i + blueShift
+    var blueOffset = elemSize*i
+    SWEEP_EVENTS[ptr++] = blue[blueOffset+istart]
+    SWEEP_EVENTS[ptr++] = -idx
+  }
+
+  //process events from left->right
+  var n = ptr >>> 1
+  isort(SWEEP_EVENTS, n)
+  
+  var redActive    = 0
+  for(var i=0; i<n; ++i) {
+    var e = SWEEP_EVENTS[2*i+1]|0
+    if(e < 0) {
+      var idx   = -e
+      var isRed = false
+      if(idx >= BLUE_FLAG) {
+        isRed = !flip
+        idx -= BLUE_FLAG 
+      } else {
+        isRed = !!flip
+        idx -= 1
+      }
+      if(isRed) {
+        sqPush(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive++, idx)
+      } else {
+        var blueId  = blueIndex[idx]
+        var bluePtr = elemSize * idx
+        
+        var b0 = blue[bluePtr+axis+1]
+        var b1 = blue[bluePtr+axis+1+d]
+
+red_loop:
+        for(var j=0; j<redActive; ++j) {
+          var oidx   = RED_SWEEP_QUEUE[j]
+          var redPtr = elemSize * oidx
+
+          if(b1 < red[redPtr+axis+1] || 
+             red[redPtr+axis+1+d] < b0) {
+            continue
+          }
+
+          for(var k=axis+2; k<d; ++k) {
+            if(blue[bluePtr + k + d] < red[redPtr + k] || 
+               red[redPtr + k + d] < blue[bluePtr + k]) {
+              continue red_loop
+            }
+          }
+
+          var redId  = redIndex[oidx]
+          var retval
+          if(flip) {
+            retval = visit(blueId, redId)
+          } else {
+            retval = visit(redId, blueId)
+          }
+          if(retval !== void 0) {
+            return retval 
+          }
+        }
+      }
+    } else {
+      sqPop(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive--, e - redShift)
+    }
+  }
+}
+
+function scanComplete(
+  d, axis, visit,
+  redStart,  redEnd, red, redIndex,
+  blueStart, blueEnd, blue, blueIndex) {
+
+  var ptr      = 0
+  var elemSize = 2*d
+  var istart   = axis
+  var iend     = axis+d
+
+  for(var i=redStart; i<redEnd; ++i) {
+    var idx = i + BLUE_FLAG
+    var redOffset = elemSize*i
+    SWEEP_EVENTS[ptr++] = red[redOffset+istart]
+    SWEEP_EVENTS[ptr++] = -idx
+    SWEEP_EVENTS[ptr++] = red[redOffset+iend]
+    SWEEP_EVENTS[ptr++] = idx
+  }
+  for(var i=blueStart; i<blueEnd; ++i) {
+    var idx = i + 1
+    var blueOffset = elemSize*i
+    SWEEP_EVENTS[ptr++] = blue[blueOffset+istart]
+    SWEEP_EVENTS[ptr++] = -idx
+  }
+
+  //process events from left->right
+  var n = ptr >>> 1
+  isort(SWEEP_EVENTS, n)
+  
+  var redActive    = 0
+  for(var i=0; i<n; ++i) {
+    var e = SWEEP_EVENTS[2*i+1]|0
+    if(e < 0) {
+      var idx   = -e
+      if(idx >= BLUE_FLAG) {
+        RED_SWEEP_QUEUE[redActive++] = idx - BLUE_FLAG
+      } else {
+        idx -= 1
+        var blueId  = blueIndex[idx]
+        var bluePtr = elemSize * idx
+
+        var b0 = blue[bluePtr+axis+1]
+        var b1 = blue[bluePtr+axis+1+d]
+
+red_loop:
+        for(var j=0; j<redActive; ++j) {
+          var oidx   = RED_SWEEP_QUEUE[j]
+          var redId  = redIndex[oidx]
+
+          if(redId === blueId) {
+            break
+          }
+
+          var redPtr = elemSize * oidx
+          if(b1 < red[redPtr+axis+1] || 
+            red[redPtr+axis+1+d] < b0) {
+            continue
+          }
+          for(var k=axis+2; k<d; ++k) {
+            if(blue[bluePtr + k + d] < red[redPtr + k] || 
+               red[redPtr + k + d]   < blue[bluePtr + k]) {
+              continue red_loop
+            }
+          }
+
+          var retval = visit(redId, blueId)
+          if(retval !== void 0) {
+            return retval 
+          }
+        }
+      }
+    } else {
+      var idx = e - BLUE_FLAG
+      for(var j=redActive-1; j>=0; --j) {
+        if(RED_SWEEP_QUEUE[j] === idx) {
+          for(var k=j+1; k<redActive; ++k) {
+            RED_SWEEP_QUEUE[k-1] = RED_SWEEP_QUEUE[k]
+          }
+          break
+        }
+      }
+      --redActive
+    }
+  }
+}
+})()
+},{"./sort":33,"bit-twiddle":36,"typedarray-pool":32}],31:[function(require,module,exports){
 'use strict'
 
 module.exports = boxIntersectIter
@@ -3199,443 +3655,7 @@ function boxIntersectIter(
     }
   }
 }
-},{"./brute":34,"./median":36,"./partition":35,"./sweep":30,"bit-twiddle":37,"typedarray-pool":32}],30:[function(require,module,exports){
-(function(){'use strict'
-
-module.exports = {
-  init:           sqInit,
-  sweepBipartite: sweepBipartite,
-  sweepComplete:  sweepComplete,
-  scanBipartite:  scanBipartite,
-  scanComplete:   scanComplete
-}
-
-var pool  = require('typedarray-pool')
-var bits  = require('bit-twiddle')
-var isort = require('./sort')
-
-//Flag for blue
-var BLUE_FLAG = (1<<28)
-
-//1D sweep event queue stuff (use pool to save space)
-var INIT_CAPACITY      = 1024
-var RED_SWEEP_QUEUE    = pool.mallocInt32(INIT_CAPACITY)
-var RED_SWEEP_INDEX    = pool.mallocInt32(INIT_CAPACITY)
-var BLUE_SWEEP_QUEUE   = pool.mallocInt32(INIT_CAPACITY)
-var BLUE_SWEEP_INDEX   = pool.mallocInt32(INIT_CAPACITY)
-var COMMON_SWEEP_QUEUE = pool.mallocInt32(INIT_CAPACITY)
-var COMMON_SWEEP_INDEX = pool.mallocInt32(INIT_CAPACITY)
-var SWEEP_EVENTS       = pool.mallocDouble(INIT_CAPACITY * 8)
-
-//Reserves memory for the 1D sweep data structures
-function sqInit(count) {
-  var rcount = bits.nextPow2(count)
-  if(RED_SWEEP_QUEUE.length < rcount) {
-    pool.free(RED_SWEEP_QUEUE)
-    RED_SWEEP_QUEUE = pool.mallocInt32(rcount)
-  }
-  if(RED_SWEEP_INDEX.length < rcount) {
-    pool.free(RED_SWEEP_INDEX)
-    RED_SWEEP_INDEX = pool.mallocInt32(rcount)
-  }
-  if(BLUE_SWEEP_QUEUE.length < rcount) {
-    pool.free(BLUE_SWEEP_QUEUE)
-    BLUE_SWEEP_QUEUE = pool.mallocInt32(rcount)
-  }
-  if(BLUE_SWEEP_INDEX.length < rcount) {
-    pool.free(BLUE_SWEEP_INDEX)
-    BLUE_SWEEP_INDEX = pool.mallocInt32(rcount)
-  }
-  if(COMMON_SWEEP_QUEUE.length < rcount) {
-    pool.free(COMMON_SWEEP_QUEUE)
-    COMMON_SWEEP_QUEUE = pool.mallocInt32(rcount)
-  }
-  if(COMMON_SWEEP_INDEX.length < rcount) {
-    pool.free(COMMON_SWEEP_INDEX)
-    COMMON_SWEEP_INDEX = pool.mallocInt32(rcount)
-  }
-  var eventLength = 8 * rcount
-  if(SWEEP_EVENTS.length < eventLength) {
-    pool.free(SWEEP_EVENTS)
-    SWEEP_EVENTS = pool.mallocDouble(eventLength)
-  }
-}
-
-//Remove an item from the active queue in O(1)
-function sqPop(queue, index, count, item) {
-  var idx = index[item]
-  var top = queue[count-1]
-  queue[idx] = top
-  index[top] = idx
-}
-
-//Insert an item into the active queue in O(1)
-function sqPush(queue, index, count, item) {
-  queue[count] = item
-  index[item]  = count
-}
-
-//Recursion base case: use 1D sweep algorithm
-function sweepBipartite(
-    d, visit,
-    redStart,  redEnd, red, redIndex,
-    blueStart, blueEnd, blue, blueIndex) {
-
-  //store events as pairs [coordinate, idx]
-  //
-  //  red create:  -(idx+1)
-  //  red destroy: idx
-  //  blue create: -(idx+BLUE_FLAG)
-  //  blue destroy: idx+BLUE_FLAG
-  //
-  var ptr      = 0
-  var elemSize = 2*d
-  var istart   = d-1
-  var iend     = elemSize-1
-
-  for(var i=redStart; i<redEnd; ++i) {
-    var idx = redIndex[i]
-    var redOffset = elemSize*i
-    SWEEP_EVENTS[ptr++] = red[redOffset+istart]
-    SWEEP_EVENTS[ptr++] = -(idx+1)
-    SWEEP_EVENTS[ptr++] = red[redOffset+iend]
-    SWEEP_EVENTS[ptr++] = idx
-  }
-
-  for(var i=blueStart; i<blueEnd; ++i) {
-    var idx = blueIndex[i]+BLUE_FLAG
-    var blueOffset = elemSize*i
-    SWEEP_EVENTS[ptr++] = blue[blueOffset+istart]
-    SWEEP_EVENTS[ptr++] = -idx
-    SWEEP_EVENTS[ptr++] = blue[blueOffset+iend]
-    SWEEP_EVENTS[ptr++] = idx
-  }
-
-  //process events from left->right
-  var n = ptr >>> 1
-  isort(SWEEP_EVENTS, n)
-  
-  var redActive  = 0
-  var blueActive = 0
-  for(var i=0; i<n; ++i) {
-    var e = SWEEP_EVENTS[2*i+1]|0
-    if(e >= BLUE_FLAG) {
-      //blue destroy event
-      e = (e-BLUE_FLAG)|0
-      sqPop(BLUE_SWEEP_QUEUE, BLUE_SWEEP_INDEX, blueActive--, e)
-    } else if(e >= 0) {
-      //red destroy event
-      sqPop(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive--, e)
-    } else if(e <= -BLUE_FLAG) {
-      //blue create event
-      e = (-e-BLUE_FLAG)|0
-      for(var j=0; j<redActive; ++j) {
-        var retval = visit(RED_SWEEP_QUEUE[j], e)
-        if(retval !== void 0) {
-          return retval
-        }
-      }
-      sqPush(BLUE_SWEEP_QUEUE, BLUE_SWEEP_INDEX, blueActive++, e)
-    } else {
-      //red create event
-      e = (-e-1)|0
-      for(var j=0; j<blueActive; ++j) {
-        var retval = visit(e, BLUE_SWEEP_QUEUE[j])
-        if(retval !== void 0) {
-          return retval
-        }
-      }
-      sqPush(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive++, e)
-    }
-  }
-}
-
-//Complete sweep
-function sweepComplete(d, visit, 
-  redStart, redEnd, red, redIndex,
-  blueStart, blueEnd, blue, blueIndex) {
-
-  var ptr      = 0
-  var elemSize = 2*d
-  var istart   = d-1
-  var iend     = elemSize-1
-
-  for(var i=redStart; i<redEnd; ++i) {
-    var idx = (redIndex[i]+1)<<1
-    var redOffset = elemSize*i
-    SWEEP_EVENTS[ptr++] = red[redOffset+istart]
-    SWEEP_EVENTS[ptr++] = -idx
-    SWEEP_EVENTS[ptr++] = red[redOffset+iend]
-    SWEEP_EVENTS[ptr++] = idx
-  }
-
-  for(var i=blueStart; i<blueEnd; ++i) {
-    var idx = (blueIndex[i]+1)<<1
-    var blueOffset = elemSize*i
-    SWEEP_EVENTS[ptr++] = blue[blueOffset+istart]
-    SWEEP_EVENTS[ptr++] = (-idx)|1
-    SWEEP_EVENTS[ptr++] = blue[blueOffset+iend]
-    SWEEP_EVENTS[ptr++] = idx|1
-  }
-
-  //process events from left->right
-  var n = ptr >>> 1
-  isort(SWEEP_EVENTS, n)
-  
-  var redActive    = 0
-  var blueActive   = 0
-  var commonActive = 0
-  for(var i=0; i<n; ++i) {
-    var e     = SWEEP_EVENTS[2*i+1]|0
-    var color = e&1
-    if(i < n-1 && (e>>1) === (SWEEP_EVENTS[2*i+3]>>1)) {
-      color = 2
-      i += 1
-    }
-    
-    if(e < 0) {
-      //Create event
-      var id = -(e>>1) - 1
-
-      //Intersect with common
-      for(var j=0; j<commonActive; ++j) {
-        var retval = visit(COMMON_SWEEP_QUEUE[j], id)
-        if(retval !== void 0) {
-          return retval
-        }
-      }
-
-      if(color !== 0) {
-        //Intersect with red
-        for(var j=0; j<redActive; ++j) {
-          var retval = visit(RED_SWEEP_QUEUE[j], id)
-          if(retval !== void 0) {
-            return retval
-          }
-        }
-      }
-
-      if(color !== 1) {
-        //Intersect with blue
-        for(var j=0; j<blueActive; ++j) {
-          var retval = visit(BLUE_SWEEP_QUEUE[j], id)
-          if(retval !== void 0) {
-            return retval
-          }
-        }
-      }
-
-      if(color === 0) {
-        //Red
-        sqPush(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive++, id)
-      } else if(color === 1) {
-        //Blue
-        sqPush(BLUE_SWEEP_QUEUE, BLUE_SWEEP_INDEX, blueActive++, id)
-      } else if(color === 2) {
-        //Both
-        sqPush(COMMON_SWEEP_QUEUE, COMMON_SWEEP_INDEX, commonActive++, id)
-      }
-    } else {
-      //Destroy event
-      var id = (e>>1) - 1
-      if(color === 0) {
-        //Red
-        sqPop(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive--, id)
-      } else if(color === 1) {
-        //Blue
-        sqPop(BLUE_SWEEP_QUEUE, BLUE_SWEEP_INDEX, blueActive--, id)
-      } else if(color === 2) {
-        //Both
-        sqPop(COMMON_SWEEP_QUEUE, COMMON_SWEEP_INDEX, commonActive--, id)
-      }
-    }
-  }
-}
-
-//Sweep and prune/scanline algorithm:
-//  Scan along axis, detect intersections
-//  Brute force all boxes along axis
-function scanBipartite(
-  d, axis, visit, flip,
-  redStart,  redEnd, red, redIndex,
-  blueStart, blueEnd, blue, blueIndex) {
-  
-  var ptr      = 0
-  var elemSize = 2*d
-  var istart   = axis
-  var iend     = axis+d
-
-  var redShift  = 1
-  var blueShift = 1
-  if(flip) {
-    blueShift = BLUE_FLAG
-  } else {
-    redShift  = BLUE_FLAG
-  }
-
-  for(var i=redStart; i<redEnd; ++i) {
-    var idx = i + redShift
-    var redOffset = elemSize*i
-    SWEEP_EVENTS[ptr++] = red[redOffset+istart]
-    SWEEP_EVENTS[ptr++] = -idx
-    SWEEP_EVENTS[ptr++] = red[redOffset+iend]
-    SWEEP_EVENTS[ptr++] = idx
-  }
-  for(var i=blueStart; i<blueEnd; ++i) {
-    var idx = i + blueShift
-    var blueOffset = elemSize*i
-    SWEEP_EVENTS[ptr++] = blue[blueOffset+istart]
-    SWEEP_EVENTS[ptr++] = -idx
-  }
-
-  //process events from left->right
-  var n = ptr >>> 1
-  isort(SWEEP_EVENTS, n)
-  
-  var redActive    = 0
-  for(var i=0; i<n; ++i) {
-    var e = SWEEP_EVENTS[2*i+1]|0
-    if(e < 0) {
-      var idx   = -e
-      var isRed = false
-      if(idx >= BLUE_FLAG) {
-        isRed = !flip
-        idx -= BLUE_FLAG 
-      } else {
-        isRed = !!flip
-        idx -= 1
-      }
-      if(isRed) {
-        sqPush(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive++, idx)
-      } else {
-        var blueId  = blueIndex[idx]
-        var bluePtr = elemSize * idx
-        
-        var b0 = blue[bluePtr+axis+1]
-        var b1 = blue[bluePtr+axis+1+d]
-
-red_loop:
-        for(var j=0; j<redActive; ++j) {
-          var oidx   = RED_SWEEP_QUEUE[j]
-          var redPtr = elemSize * oidx
-
-          if(b1 < red[redPtr+axis+1] || 
-             red[redPtr+axis+1+d] < b0) {
-            continue
-          }
-
-          for(var k=axis+2; k<d; ++k) {
-            if(blue[bluePtr + k + d] < red[redPtr + k] || 
-               red[redPtr + k + d] < blue[bluePtr + k]) {
-              continue red_loop
-            }
-          }
-
-          var redId  = redIndex[oidx]
-          var retval
-          if(flip) {
-            retval = visit(blueId, redId)
-          } else {
-            retval = visit(redId, blueId)
-          }
-          if(retval !== void 0) {
-            return retval 
-          }
-        }
-      }
-    } else {
-      sqPop(RED_SWEEP_QUEUE, RED_SWEEP_INDEX, redActive--, e - redShift)
-    }
-  }
-}
-
-function scanComplete(
-  d, axis, visit,
-  redStart,  redEnd, red, redIndex,
-  blueStart, blueEnd, blue, blueIndex) {
-
-  var ptr      = 0
-  var elemSize = 2*d
-  var istart   = axis
-  var iend     = axis+d
-
-  for(var i=redStart; i<redEnd; ++i) {
-    var idx = i + BLUE_FLAG
-    var redOffset = elemSize*i
-    SWEEP_EVENTS[ptr++] = red[redOffset+istart]
-    SWEEP_EVENTS[ptr++] = -idx
-    SWEEP_EVENTS[ptr++] = red[redOffset+iend]
-    SWEEP_EVENTS[ptr++] = idx
-  }
-  for(var i=blueStart; i<blueEnd; ++i) {
-    var idx = i + 1
-    var blueOffset = elemSize*i
-    SWEEP_EVENTS[ptr++] = blue[blueOffset+istart]
-    SWEEP_EVENTS[ptr++] = -idx
-  }
-
-  //process events from left->right
-  var n = ptr >>> 1
-  isort(SWEEP_EVENTS, n)
-  
-  var redActive    = 0
-  for(var i=0; i<n; ++i) {
-    var e = SWEEP_EVENTS[2*i+1]|0
-    if(e < 0) {
-      var idx   = -e
-      if(idx >= BLUE_FLAG) {
-        RED_SWEEP_QUEUE[redActive++] = idx - BLUE_FLAG
-      } else {
-        idx -= 1
-        var blueId  = blueIndex[idx]
-        var bluePtr = elemSize * idx
-
-        var b0 = blue[bluePtr+axis+1]
-        var b1 = blue[bluePtr+axis+1+d]
-
-red_loop:
-        for(var j=0; j<redActive; ++j) {
-          var oidx   = RED_SWEEP_QUEUE[j]
-          var redId  = redIndex[oidx]
-
-          if(redId === blueId) {
-            break
-          }
-
-          var redPtr = elemSize * oidx
-          if(b1 < red[redPtr+axis+1] || 
-            red[redPtr+axis+1+d] < b0) {
-            continue
-          }
-          for(var k=axis+2; k<d; ++k) {
-            if(blue[bluePtr + k + d] < red[redPtr + k] || 
-               red[redPtr + k + d]   < blue[bluePtr + k]) {
-              continue red_loop
-            }
-          }
-
-          var retval = visit(redId, blueId)
-          if(retval !== void 0) {
-            return retval 
-          }
-        }
-      }
-    } else {
-      var idx = e - BLUE_FLAG
-      for(var j=redActive-1; j>=0; --j) {
-        if(RED_SWEEP_QUEUE[j] === idx) {
-          for(var k=j+1; k<redActive; ++k) {
-            RED_SWEEP_QUEUE[k-1] = RED_SWEEP_QUEUE[k]
-          }
-          break
-        }
-      }
-      --redActive
-    }
-  }
-}
-})()
-},{"./sort":33,"bit-twiddle":37,"typedarray-pool":32}],36:[function(require,module,exports){
+},{"./brute":34,"./median":37,"./partition":35,"./sweep":30,"bit-twiddle":36,"typedarray-pool":32}],37:[function(require,module,exports){
 'use strict'
 
 module.exports = findMedian
@@ -3779,6 +3799,262 @@ function findMedian(d, axis, start, end, boxes, ids) {
     boxes[elemSize*mid+axis])
 }
 },{"./partition":35}],38:[function(require,module,exports){
+"use strict"
+
+function dupe_array(count, value, i) {
+  var c = count[i]|0
+  if(c <= 0) {
+    return []
+  }
+  var result = new Array(c), j
+  if(i === count.length-1) {
+    for(j=0; j<c; ++j) {
+      result[j] = value
+    }
+  } else {
+    for(j=0; j<c; ++j) {
+      result[j] = dupe_array(count, value, i+1)
+    }
+  }
+  return result
+}
+
+function dupe_number(count, value) {
+  var result, i
+  result = new Array(count)
+  for(i=0; i<count; ++i) {
+    result[i] = value
+  }
+  return result
+}
+
+function dupe(count, value) {
+  if(typeof value === "undefined") {
+    value = 0
+  }
+  switch(typeof count) {
+    case "number":
+      if(count > 0) {
+        return dupe_number(count|0, value)
+      }
+    break
+    case "object":
+      if(typeof (count.length) === "number") {
+        return dupe_array(count, value, 0)
+      }
+    break
+  }
+  return []
+}
+
+module.exports = dupe
+},{}],36:[function(require,module,exports){
+/**
+ * Bit twiddling hacks for JavaScript.
+ *
+ * Author: Mikola Lysenko
+ *
+ * Ported from Stanford bit twiddling hack library:
+ *    http://graphics.stanford.edu/~seander/bithacks.html
+ */
+
+"use strict"; "use restrict";
+
+//Number of bits in an integer
+var INT_BITS = 32;
+
+//Constants
+exports.INT_BITS  = INT_BITS;
+exports.INT_MAX   =  0x7fffffff;
+exports.INT_MIN   = -1<<(INT_BITS-1);
+
+//Returns -1, 0, +1 depending on sign of x
+exports.sign = function(v) {
+  return (v > 0) - (v < 0);
+}
+
+//Computes absolute value of integer
+exports.abs = function(v) {
+  var mask = v >> (INT_BITS-1);
+  return (v ^ mask) - mask;
+}
+
+//Computes minimum of integers x and y
+exports.min = function(x, y) {
+  return y ^ ((x ^ y) & -(x < y));
+}
+
+//Computes maximum of integers x and y
+exports.max = function(x, y) {
+  return x ^ ((x ^ y) & -(x < y));
+}
+
+//Checks if a number is a power of two
+exports.isPow2 = function(v) {
+  return !(v & (v-1)) && (!!v);
+}
+
+//Computes log base 2 of v
+exports.log2 = function(v) {
+  var r, shift;
+  r =     (v > 0xFFFF) << 4; v >>>= r;
+  shift = (v > 0xFF  ) << 3; v >>>= shift; r |= shift;
+  shift = (v > 0xF   ) << 2; v >>>= shift; r |= shift;
+  shift = (v > 0x3   ) << 1; v >>>= shift; r |= shift;
+  return r | (v >> 1);
+}
+
+//Computes log base 10 of v
+exports.log10 = function(v) {
+  return  (v >= 1000000000) ? 9 : (v >= 100000000) ? 8 : (v >= 10000000) ? 7 :
+          (v >= 1000000) ? 6 : (v >= 100000) ? 5 : (v >= 10000) ? 4 :
+          (v >= 1000) ? 3 : (v >= 100) ? 2 : (v >= 10) ? 1 : 0;
+}
+
+//Counts number of bits
+exports.popCount = function(v) {
+  v = v - ((v >>> 1) & 0x55555555);
+  v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
+  return ((v + (v >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24;
+}
+
+//Counts number of trailing zeros
+function countTrailingZeros(v) {
+  var c = 32;
+  v &= -v;
+  if (v) c--;
+  if (v & 0x0000FFFF) c -= 16;
+  if (v & 0x00FF00FF) c -= 8;
+  if (v & 0x0F0F0F0F) c -= 4;
+  if (v & 0x33333333) c -= 2;
+  if (v & 0x55555555) c -= 1;
+  return c;
+}
+exports.countTrailingZeros = countTrailingZeros;
+
+//Rounds to next power of 2
+exports.nextPow2 = function(v) {
+  v += v === 0;
+  --v;
+  v |= v >>> 1;
+  v |= v >>> 2;
+  v |= v >>> 4;
+  v |= v >>> 8;
+  v |= v >>> 16;
+  return v + 1;
+}
+
+//Rounds down to previous power of 2
+exports.prevPow2 = function(v) {
+  v |= v >>> 1;
+  v |= v >>> 2;
+  v |= v >>> 4;
+  v |= v >>> 8;
+  v |= v >>> 16;
+  return v - (v>>>1);
+}
+
+//Computes parity of word
+exports.parity = function(v) {
+  v ^= v >>> 16;
+  v ^= v >>> 8;
+  v ^= v >>> 4;
+  v &= 0xf;
+  return (0x6996 >>> v) & 1;
+}
+
+var REVERSE_TABLE = new Array(256);
+
+(function(tab) {
+  for(var i=0; i<256; ++i) {
+    var v = i, r = i, s = 7;
+    for (v >>>= 1; v; v >>>= 1) {
+      r <<= 1;
+      r |= v & 1;
+      --s;
+    }
+    tab[i] = (r << s) & 0xff;
+  }
+})(REVERSE_TABLE);
+
+//Reverse bits in a 32 bit word
+exports.reverse = function(v) {
+  return  (REVERSE_TABLE[ v         & 0xff] << 24) |
+          (REVERSE_TABLE[(v >>> 8)  & 0xff] << 16) |
+          (REVERSE_TABLE[(v >>> 16) & 0xff] << 8)  |
+           REVERSE_TABLE[(v >>> 24) & 0xff];
+}
+
+//Interleave bits of 2 coordinates with 16 bits.  Useful for fast quadtree codes
+exports.interleave2 = function(x, y) {
+  x &= 0xFFFF;
+  x = (x | (x << 8)) & 0x00FF00FF;
+  x = (x | (x << 4)) & 0x0F0F0F0F;
+  x = (x | (x << 2)) & 0x33333333;
+  x = (x | (x << 1)) & 0x55555555;
+
+  y &= 0xFFFF;
+  y = (y | (y << 8)) & 0x00FF00FF;
+  y = (y | (y << 4)) & 0x0F0F0F0F;
+  y = (y | (y << 2)) & 0x33333333;
+  y = (y | (y << 1)) & 0x55555555;
+
+  return x | (y << 1);
+}
+
+//Extracts the nth interleaved component
+exports.deinterleave2 = function(v, n) {
+  v = (v >>> n) & 0x55555555;
+  v = (v | (v >>> 1))  & 0x33333333;
+  v = (v | (v >>> 2))  & 0x0F0F0F0F;
+  v = (v | (v >>> 4))  & 0x00FF00FF;
+  v = (v | (v >>> 16)) & 0x000FFFF;
+  return (v << 16) >> 16;
+}
+
+
+//Interleave bits of 3 coordinates, each with 10 bits.  Useful for fast octree codes
+exports.interleave3 = function(x, y, z) {
+  x &= 0x3FF;
+  x  = (x | (x<<16)) & 4278190335;
+  x  = (x | (x<<8))  & 251719695;
+  x  = (x | (x<<4))  & 3272356035;
+  x  = (x | (x<<2))  & 1227133513;
+
+  y &= 0x3FF;
+  y  = (y | (y<<16)) & 4278190335;
+  y  = (y | (y<<8))  & 251719695;
+  y  = (y | (y<<4))  & 3272356035;
+  y  = (y | (y<<2))  & 1227133513;
+  x |= (y << 1);
+  
+  z &= 0x3FF;
+  z  = (z | (z<<16)) & 4278190335;
+  z  = (z | (z<<8))  & 251719695;
+  z  = (z | (z<<4))  & 3272356035;
+  z  = (z | (z<<2))  & 1227133513;
+  
+  return x | (z << 2);
+}
+
+//Extracts nth interleaved component of a 3-tuple
+exports.deinterleave3 = function(v, n) {
+  v = (v >>> n)       & 1227133513;
+  v = (v | (v>>>2))   & 3272356035;
+  v = (v | (v>>>4))   & 251719695;
+  v = (v | (v>>>8))   & 4278190335;
+  v = (v | (v>>>16))  & 0x3FF;
+  return (v<<22)>>22;
+}
+
+//Computes next combination in colexicographic order (this is mistakenly called nextPermutation on the bit twiddling hacks page)
+exports.nextCombination = function(v) {
+  var t = v | (v - 1);
+  return (t + 1) | (((~t & -~t) - 1) >>> (countTrailingZeros(v) + 1));
+}
+
+
+},{}],39:[function(require,module,exports){
 require=(function(e,t,n,r){function i(r){if(!n[r]){if(!t[r]){if(e)return e(r);throw new Error("Cannot find module '"+r+"'")}var s=n[r]={exports:{}};t[r][0](function(e){var n=t[r][1][e];return i(n?n:e)},s,s.exports)}return n[r].exports}for(var s=0;s<r.length;s++)i(r[s]);return i})(typeof require!=="undefined"&&require,{1:[function(require,module,exports){
 exports.readIEEE754 = function(buffer, offset, isBE, mLen, nBytes) {
   var e, m,
@@ -7859,261 +8135,5 @@ exports.clearCache = function clearCache() {
   }
 }
 })(require("__browserify_buffer").Buffer,window)
-},{"__browserify_buffer":38,"bit-twiddle":37,"dup":39}],37:[function(require,module,exports){
-/**
- * Bit twiddling hacks for JavaScript.
- *
- * Author: Mikola Lysenko
- *
- * Ported from Stanford bit twiddling hack library:
- *    http://graphics.stanford.edu/~seander/bithacks.html
- */
-
-"use strict"; "use restrict";
-
-//Number of bits in an integer
-var INT_BITS = 32;
-
-//Constants
-exports.INT_BITS  = INT_BITS;
-exports.INT_MAX   =  0x7fffffff;
-exports.INT_MIN   = -1<<(INT_BITS-1);
-
-//Returns -1, 0, +1 depending on sign of x
-exports.sign = function(v) {
-  return (v > 0) - (v < 0);
-}
-
-//Computes absolute value of integer
-exports.abs = function(v) {
-  var mask = v >> (INT_BITS-1);
-  return (v ^ mask) - mask;
-}
-
-//Computes minimum of integers x and y
-exports.min = function(x, y) {
-  return y ^ ((x ^ y) & -(x < y));
-}
-
-//Computes maximum of integers x and y
-exports.max = function(x, y) {
-  return x ^ ((x ^ y) & -(x < y));
-}
-
-//Checks if a number is a power of two
-exports.isPow2 = function(v) {
-  return !(v & (v-1)) && (!!v);
-}
-
-//Computes log base 2 of v
-exports.log2 = function(v) {
-  var r, shift;
-  r =     (v > 0xFFFF) << 4; v >>>= r;
-  shift = (v > 0xFF  ) << 3; v >>>= shift; r |= shift;
-  shift = (v > 0xF   ) << 2; v >>>= shift; r |= shift;
-  shift = (v > 0x3   ) << 1; v >>>= shift; r |= shift;
-  return r | (v >> 1);
-}
-
-//Computes log base 10 of v
-exports.log10 = function(v) {
-  return  (v >= 1000000000) ? 9 : (v >= 100000000) ? 8 : (v >= 10000000) ? 7 :
-          (v >= 1000000) ? 6 : (v >= 100000) ? 5 : (v >= 10000) ? 4 :
-          (v >= 1000) ? 3 : (v >= 100) ? 2 : (v >= 10) ? 1 : 0;
-}
-
-//Counts number of bits
-exports.popCount = function(v) {
-  v = v - ((v >>> 1) & 0x55555555);
-  v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
-  return ((v + (v >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24;
-}
-
-//Counts number of trailing zeros
-function countTrailingZeros(v) {
-  var c = 32;
-  v &= -v;
-  if (v) c--;
-  if (v & 0x0000FFFF) c -= 16;
-  if (v & 0x00FF00FF) c -= 8;
-  if (v & 0x0F0F0F0F) c -= 4;
-  if (v & 0x33333333) c -= 2;
-  if (v & 0x55555555) c -= 1;
-  return c;
-}
-exports.countTrailingZeros = countTrailingZeros;
-
-//Rounds to next power of 2
-exports.nextPow2 = function(v) {
-  v += v === 0;
-  --v;
-  v |= v >>> 1;
-  v |= v >>> 2;
-  v |= v >>> 4;
-  v |= v >>> 8;
-  v |= v >>> 16;
-  return v + 1;
-}
-
-//Rounds down to previous power of 2
-exports.prevPow2 = function(v) {
-  v |= v >>> 1;
-  v |= v >>> 2;
-  v |= v >>> 4;
-  v |= v >>> 8;
-  v |= v >>> 16;
-  return v - (v>>>1);
-}
-
-//Computes parity of word
-exports.parity = function(v) {
-  v ^= v >>> 16;
-  v ^= v >>> 8;
-  v ^= v >>> 4;
-  v &= 0xf;
-  return (0x6996 >>> v) & 1;
-}
-
-var REVERSE_TABLE = new Array(256);
-
-(function(tab) {
-  for(var i=0; i<256; ++i) {
-    var v = i, r = i, s = 7;
-    for (v >>>= 1; v; v >>>= 1) {
-      r <<= 1;
-      r |= v & 1;
-      --s;
-    }
-    tab[i] = (r << s) & 0xff;
-  }
-})(REVERSE_TABLE);
-
-//Reverse bits in a 32 bit word
-exports.reverse = function(v) {
-  return  (REVERSE_TABLE[ v         & 0xff] << 24) |
-          (REVERSE_TABLE[(v >>> 8)  & 0xff] << 16) |
-          (REVERSE_TABLE[(v >>> 16) & 0xff] << 8)  |
-           REVERSE_TABLE[(v >>> 24) & 0xff];
-}
-
-//Interleave bits of 2 coordinates with 16 bits.  Useful for fast quadtree codes
-exports.interleave2 = function(x, y) {
-  x &= 0xFFFF;
-  x = (x | (x << 8)) & 0x00FF00FF;
-  x = (x | (x << 4)) & 0x0F0F0F0F;
-  x = (x | (x << 2)) & 0x33333333;
-  x = (x | (x << 1)) & 0x55555555;
-
-  y &= 0xFFFF;
-  y = (y | (y << 8)) & 0x00FF00FF;
-  y = (y | (y << 4)) & 0x0F0F0F0F;
-  y = (y | (y << 2)) & 0x33333333;
-  y = (y | (y << 1)) & 0x55555555;
-
-  return x | (y << 1);
-}
-
-//Extracts the nth interleaved component
-exports.deinterleave2 = function(v, n) {
-  v = (v >>> n) & 0x55555555;
-  v = (v | (v >>> 1))  & 0x33333333;
-  v = (v | (v >>> 2))  & 0x0F0F0F0F;
-  v = (v | (v >>> 4))  & 0x00FF00FF;
-  v = (v | (v >>> 16)) & 0x000FFFF;
-  return (v << 16) >> 16;
-}
-
-
-//Interleave bits of 3 coordinates, each with 10 bits.  Useful for fast octree codes
-exports.interleave3 = function(x, y, z) {
-  x &= 0x3FF;
-  x  = (x | (x<<16)) & 4278190335;
-  x  = (x | (x<<8))  & 251719695;
-  x  = (x | (x<<4))  & 3272356035;
-  x  = (x | (x<<2))  & 1227133513;
-
-  y &= 0x3FF;
-  y  = (y | (y<<16)) & 4278190335;
-  y  = (y | (y<<8))  & 251719695;
-  y  = (y | (y<<4))  & 3272356035;
-  y  = (y | (y<<2))  & 1227133513;
-  x |= (y << 1);
-  
-  z &= 0x3FF;
-  z  = (z | (z<<16)) & 4278190335;
-  z  = (z | (z<<8))  & 251719695;
-  z  = (z | (z<<4))  & 3272356035;
-  z  = (z | (z<<2))  & 1227133513;
-  
-  return x | (z << 2);
-}
-
-//Extracts nth interleaved component of a 3-tuple
-exports.deinterleave3 = function(v, n) {
-  v = (v >>> n)       & 1227133513;
-  v = (v | (v>>>2))   & 3272356035;
-  v = (v | (v>>>4))   & 251719695;
-  v = (v | (v>>>8))   & 4278190335;
-  v = (v | (v>>>16))  & 0x3FF;
-  return (v<<22)>>22;
-}
-
-//Computes next combination in colexicographic order (this is mistakenly called nextPermutation on the bit twiddling hacks page)
-exports.nextCombination = function(v) {
-  var t = v | (v - 1);
-  return (t + 1) | (((~t & -~t) - 1) >>> (countTrailingZeros(v) + 1));
-}
-
-
-},{}],39:[function(require,module,exports){
-"use strict"
-
-function dupe_array(count, value, i) {
-  var c = count[i]|0
-  if(c <= 0) {
-    return []
-  }
-  var result = new Array(c), j
-  if(i === count.length-1) {
-    for(j=0; j<c; ++j) {
-      result[j] = value
-    }
-  } else {
-    for(j=0; j<c; ++j) {
-      result[j] = dupe_array(count, value, i+1)
-    }
-  }
-  return result
-}
-
-function dupe_number(count, value) {
-  var result, i
-  result = new Array(count)
-  for(i=0; i<count; ++i) {
-    result[i] = value
-  }
-  return result
-}
-
-function dupe(count, value) {
-  if(typeof value === "undefined") {
-    value = 0
-  }
-  switch(typeof count) {
-    case "number":
-      if(count > 0) {
-        return dupe_number(count|0, value)
-      }
-    break
-    case "object":
-      if(typeof (count.length) === "number") {
-        return dupe_array(count, value, 0)
-      }
-    break
-  }
-  return []
-}
-
-module.exports = dupe
-},{}]},{},[1])
+},{"__browserify_buffer":39,"bit-twiddle":36,"dup":38}]},{},[1])
 ;
