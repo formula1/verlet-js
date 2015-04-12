@@ -5,46 +5,69 @@ var uglify = require("uglify-js");
 var fs = require("fs");
 var watch = require("node-watch");
 var tester = require("./test");
+var async = require("async");
 
-if(process.env.VERLET_WATCH){
-  console.log("Watching: "+__dirname+"/lib");
-  build();
-  watch(__dirname+"/lib", function(filename) {
-    build();
+console.log("Watching: "+__dirname+"/lib");
+
+var tasks = [];
+if(process.env.VERLET_TEST){
+  tasks.push(function(next){
+    tester(function(e,clean){
+      if(e) return next(e);
+      if(!clean) return next(new Error("not clean"));
+      console.log("done: "+Date.now());
+      next();
+    });
   });
-}else{
-  build();
 }
 
-process.stdin.on("data", function(data){
-  if(data.toString() == "\n")
-    build();
-})
+tasks.push(build);
 
-function build(){
+if(process.env.VERLET_WATCH){
+  watch(__dirname+"/lib", function(filename) {
+    run();
+  });
+  process.stdin.on("data", function(data){
+    if(data.toString() != "\n") return;
+    run();
+  });
+}
+
+var running = false;
+function run(){
+  if(running) return;
+  running = true;
+  async.series(tasks,function(e){
+    if(e) console.error(e);
+    running = false;
+  });
+}
+
+run();
+
+function build(next){
   var b = browserify(__dirname+"/lib/dist.js", {basedir:__dirname+"/lib"});
   var writer = new fs.createWriteStream(__dirname+"/js/verlet-"+pack.version+".js");
-  var bund = b .bundle();
+  var bund = b.bundle();
   bund.on("error",function(e){
     console.log("Bundle Error");
-    console.log(e);
+    next(e);
     return;
   });
   bund.pipe(writer).on("finish",function(){
     writer.close(function(){
+      var result;
       try{
-        var result = uglify.minify(__dirname+"/js/verlet-"+pack.version+".js");
+        result = uglify.minify(__dirname+"/js/verlet-"+pack.version+".js");
       }catch(e){
         console.log("Uglify Error");
-        console.log(e.stack);
-        return;
+        return next(e);
       }
-      fs.writeFileSync(__dirname+"/js/verlet-"+pack.version+".min.js", result.code);
-      if(!process.env.VERLET_TEST) return;
-
-      tester(function(clean){
-        if(clean) console.log("done: "+Date.now());
-      });
-    })
+      fs.writeFile(
+        __dirname+"/js/verlet-"+pack.version+".min.js",
+        result.code,
+        next
+      );
+    });
   });
 }

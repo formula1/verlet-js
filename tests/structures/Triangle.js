@@ -3,8 +3,8 @@ var Vec2 = require("../../lib/structures/Vec2");
 var Triangle = require("../../lib/structures/Triangle");
 
 var assert = function(label, expression) {
-  console.log("Triangle(" + label + "): " + (expression == true ? "PASS" : "FAIL"));
-  if (expression != true)
+  console.log("Triangle(" + label + "): " + (expression === true ? "PASS" : "FAIL"));
+  if (expression !== true)
     throw "assertion failed";
 };
 
@@ -18,15 +18,15 @@ assert("equality",
 assert("epsilon equality",
 (new Triangle(new Vec2(4,4), new Vec2(-4,4), new Vec2(-4,-4))
 .epsilonEquals(
-  new Triangle(new Vec2(4.01,4.02), new Vec2(-4.03,4.04), new Vec2(-4.05,-4.06))
-  ,.07
+  new Triangle(new Vec2(4.01,4.02), new Vec2(-4.03,4.04), new Vec2(-4.05,-4.06)),
+  0.07
 ))
 );
 assert("epsilon non-equality",
 !(new Triangle(new Vec2(4,4), new Vec2(-4,4), new Vec2(-4,-4))
 .epsilonEquals(
-  new Triangle(new Vec2(4.01,4.02), new Vec2(-4.03,4.04), new Vec2(-4.05,-4.06))
-  ,.01
+  new Triangle(new Vec2(4.01,4.02), new Vec2(-4.03,4.04), new Vec2(-4.05,-4.06)),
+  0.01
 ))
 );
 
@@ -37,15 +37,15 @@ assert("shape equality",
 assert("epsilon shape equality",
 (new Triangle(new Vec2(4,4), new Vec2(-4,4), new Vec2(-4,-4))
 .epsilonEqualShape(
-  new Triangle(new Vec2(4.01,4.02), new Vec2(4.03,-4.04), new Vec2(-4.05,-4.06))
-  ,.07
+  new Triangle(new Vec2(4.01,4.02), new Vec2(4.03,-4.04), new Vec2(-4.05,-4.06)),
+  0.07
 ))
 );
 assert("epsilon shape non-equality",
 !(new Triangle(new Vec2(4,4), new Vec2(-4,4), new Vec2(-4,-4))
 .epsilonEqualShape(
-  new Triangle(new Vec2(4.01,4.02), new Vec2(4.03,-4.04), new Vec2(-4.05,-4.06))
-  ,.01
+  new Triangle(new Vec2(4.01,4.02), new Vec2(4.03,-4.04), new Vec2(-4.05,-4.06)),
+  0.01
 ))
 );
 

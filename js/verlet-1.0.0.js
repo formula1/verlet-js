@@ -50,236 +50,6 @@ if(!Math.lawCos){
   }
 }
 
-},{}],7:[function(require,module,exports){
-
-/*
-Copyright 2013 Sub Protocol and other contributors
-http://subprotocol.com/
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-// A simple 2-dimensional vector implementation
-
-module.exports = Vec2;
-
-function Vec2(x, y) {
-	this.x = x || 0;
-	this.y = y || 0;
-	var _this = this;
-	Object.defineProperty(this,"asArray",{
-		get:function(){
-			return [_this.x,_this.y];
-		}
-	});
-}
-
-Vec2.prototype.zero = function(){
-	this.x = 0;
-	this.y = 0;
-	return this;
-};
-
-Vec2.prototype.posinf = function(){
-	this.x = Number.POSITIVE_INFINITY;
-	this.y = Number.POSITIVE_INFINITY;
-	return this;
-};
-
-Vec2.prototype.neginf = function(){
-	this.x = Number.NEGATIVE_INFINITY;
-	this.y = Number.NEGATIVE_INFINITY;
-	return this;
-};
-
-Vec2.prototype.isNaN = function(){
-	if(isNaN(this.x)) return true;
-	if(isNaN(this.y)) return true;
-	return false;
-};
-
-Vec2.prototype.clone = function(){
-	return new Vec2(this.x,this.y);
-};
-
-Vec2.prototype.add = function(v) {
-	this.x += v.x;
-	this.y += v.y;
-	return this;
-};
-
-Vec2.prototype.sub = function(v){
-	this.x -= v.x;
-	this.y -= v.y;
-	return this;
-};
-
-Vec2.prototype.mul = function(v) {
-	if(typeof v == "number"){
-		return this.scale(v);
-	}
-	this.x *= v.x;
-	this.y *= v.y;
-	return this;
-};
-
-Vec2.prototype.div = function(v) {
-	if(typeof v == "number"){
-		return this.scale(1/v);
-	}
-	this.x /= v.x;
-	this.y /= v.y;
-	return this;
-};
-
-Vec2.prototype.scale = function(coef) {
-	this.x *= coef;
-	this.y *= coef;
-	return this;
-};
-
-Vec2.prototype.scaleI = function(coef) {
-	this.x /= coef;
-	this.y /= coef;
-	return this;
-};
-
-
-Vec2.prototype.pow = function(num){
-	this.x = Math.pow(this.x,num);
-	this.y = Math.pow(this.y,num);
-	return this;
-};
-
-
-Vec2.prototype.normalize = function(){
-	var len = this.length();
-	this.x /= len;
-	this.y /= len;
-	return this;
-};
-
-Vec2.prototype.normal = function() {
-	var m = Math.sqrt(this.x*this.x + this.y*this.y);
-	return new Vec2(this.x/m, this.y/m);
-};
-
-Vec2.prototype.rotate = function(origin, theta) {
-	var x = this.x - origin.x;
-	var y = this.y - origin.y;
-	this.x = x*Math.cos(theta) - y*Math.sin(theta) + origin.x;
-	this.y = x*Math.sin(theta) + y*Math.cos(theta) + origin.y;
-	return this;
-};
-
-Vec2.prototype.min = function(v){
-	this.x = Math.min(this.x, v.x);
-	this.y = Math.min(this.y, v.y);
-	return this;
-};
-
-Vec2.prototype.mid = function(v){
-	this.x = (this.x+v.x)/2;
-	this.y = (this.y+v.y)/2;
-	return this;
-};
-
-Vec2.prototype.max = function(v){
-	this.x = Math.max(this.x, v.x);
-	this.y = Math.max(this.y, v.y);
-	return this;
-};
-
-Vec2.prototype.set = function(v) {
-	this.x = v.x;
-	this.y = v.y;
-	return this;
-};
-
-Vec2.prototype.swap = function() {
-	var temp = this.x;
-	this.x = this.y;
-	this.y = temp;
-	return this;
-};
-
-
-Vec2.prototype.equals = function(v) {
-	return this.x == v.x && this.y == v.y;
-};
-
-Vec2.prototype.epsilonEquals = function(v, epsilon) {
-	return Math.abs(this.x - v.x) <= epsilon && Math.abs(this.y - v.y) <= epsilon;
-};
-
-Vec2.prototype.length = function() {
-	return Math.sqrt(this.x*this.x + this.y*this.y);
-};
-
-Vec2.prototype.length2 = function() {
-	return this.x*this.x + this.y*this.y;
-};
-
-Vec2.prototype.dist = function(v) {
-	return Math.sqrt(this.dist2(v));
-};
-
-Vec2.prototype.dist2 = function(v) {
-	var x = v.x - this.x;
-	var y = v.y - this.y;
-	return x*x + y*y;
-};
-
-Vec2.prototype.dot = function(v) {
-	return this.x*v.x + this.y*v.y;
-};
-
-Vec2.prototype.cross = function(v){
-	return this.x * v.y - this.y * v.x;
-};
-
-Vec2.prototype.angle = function(v) {
-	return Math.atan2(this.x*v.y-this.y*v.x,this.x*v.x+this.y*v.y);
-};
-
-Vec2.prototype.angle2 = function(vLeft, vRight) {
-	return vLeft.clone().sub(this).angle(vRight.clone().sub(this));
-};
-
-Vec2.prototype.slope = function(){
-	return this.y / this.x;
-};
-
-Vec2.prototype.sum = function(){
-	return this.y + this.x;
-};
-
-
-Vec2.prototype.toString = function() {
-	return "(" + this.x + ", " + this.y + ")";
-};
-
-Vec2.prototype.toArray = function() {
-	return [this.x,this.y];
-};
-
 },{}],3:[function(require,module,exports){
 
 window.requestAnimFrame = window.requestAnimationFrame
@@ -377,7 +147,166 @@ VerletDraw.prototype.draw = function() {
   }
 }
 
-},{"./verlet.js":4}],4:[function(require,module,exports){
+},{"./verlet.js":4}],6:[function(require,module,exports){
+
+/*
+Copyright 2013 Sub Protocol and other contributors
+http://subprotocol.com/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+// generic verlet entities
+
+var VerletJS = require('./verlet')
+var Particle = VerletJS.Particle
+var constraints = require('./constraint')
+var DistanceConstraint = constraints.DistanceConstraint
+
+VerletJS.prototype.point = function(pos) {
+	var composite = new this.Composite();
+	composite.particles.push(new Particle(pos));
+	this.composites.push(composite);
+	return composite;
+}
+
+VerletJS.prototype.lineSegments = function(vertices, stiffness, circle) {
+	var i;
+
+	var composite = new this.Composite();
+
+	for (i in vertices) {
+		composite.particles.push(new Particle(vertices[i]));
+		if (i > 0)
+			composite.constraints.push(
+				new DistanceConstraint(
+					composite.particles[i],
+					composite.particles[i-1],
+					stiffness
+				)
+			);
+	}
+	if(circle){
+		composite.constraints.push(
+			new DistanceConstraint(
+				composite.particles[composite.particles.length-1],
+				composite.particles[0],
+				stiffness
+			)
+		)
+	}
+
+	this.composites.push(composite);
+	return composite;
+}
+
+VerletJS.prototype.cloth = function(origin, width, height, segments, pinMod, stiffness) {
+
+	var composite = new this.Composite();
+
+	var xStride = width/segments;
+	var yStride = height/segments;
+
+	var x,y;
+	for (y=0;y<segments;++y) {
+		for (x=0;x<segments;++x) {
+			var px = origin.x + x*xStride - width/2 + xStride/2;
+			var py = origin.y + y*yStride - height/2 + yStride/2;
+			composite.particles.push(new Particle(new Vec2(px, py)));
+
+			if (x > 0){
+				composite.constraints.push(
+					new DistanceConstraint(
+						composite.particles[y*segments+x],
+						composite.particles[y*segments+x-1],
+						stiffness
+					)
+				);
+			}
+
+			if (y > 0){
+				composite.constraints.push(
+					new DistanceConstraint(
+						composite.particles[y*segments+x],
+						composite.particles[(y-1)*segments+x],
+						stiffness
+					)
+				);
+			}
+		}
+	}
+
+	for (x=0;x<segments;++x) {
+		if (x%pinMod == 0)
+		composite.pin(x);
+	}
+
+	this.composites.push(composite);
+	return composite;
+}
+
+VerletJS.prototype.tire = function(origin, radius, segments, spokeStiffness, treadStiffness) {
+	var stride = (2*Math.PI)/segments;
+	var i;
+
+	var composite = new this.Composite();
+
+	// particles
+	for (i=0;i<segments;++i) {
+		var theta = i*stride;
+		composite.particles.push(new Particle(new Vec2(origin.x + Math.cos(theta)*radius, origin.y + Math.sin(theta)*radius)));
+	}
+
+	var center = new Particle(origin);
+	composite.particles.push(center);
+
+	// constraints
+	for (i=0;i<segments;++i) {
+		composite.constraints.push(
+			new DistanceConstraint(
+				composite.particles[i],
+				composite.particles[(i+1)%segments],
+				treadStiffness
+			)
+		);
+		composite.constraints.push(
+			new DistanceConstraint(
+				composite.particles[i],
+				center,
+				spokeStiffness
+			)
+		);
+		composite.constraints.push(
+			new DistanceConstraint(
+				composite.particles[i],
+				composite.particles[(i+5)%segments],
+				treadStiffness
+			)
+		);
+	}
+
+	this.composites.push(composite);
+	return composite;
+}
+
+},{"./constraint":5,"./verlet":4}],4:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -559,166 +488,7 @@ exports.AngleConstraint = require("./constraints/AngleConstraint");
 exports.MidpointAreaConstraint = require("./constraints/AreaConstraint");
 exports.ScaledAreaConstraint = require("./constraints/InflateAreaConstraint");
 
-},{"./constraints/AngleConstraint":13,"./constraints/AreaConstraint":14,"./constraints/DistanceConstraint":11,"./constraints/InflateAreaConstraint":15,"./constraints/PinConstraint":12,"./structures/Vec2":7}],6:[function(require,module,exports){
-
-/*
-Copyright 2013 Sub Protocol and other contributors
-http://subprotocol.com/
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-// generic verlet entities
-
-var VerletJS = require('./verlet')
-var Particle = VerletJS.Particle
-var constraints = require('./constraint')
-var DistanceConstraint = constraints.DistanceConstraint
-
-VerletJS.prototype.point = function(pos) {
-	var composite = new this.Composite();
-	composite.particles.push(new Particle(pos));
-	this.composites.push(composite);
-	return composite;
-}
-
-VerletJS.prototype.lineSegments = function(vertices, stiffness, circle) {
-	var i;
-
-	var composite = new this.Composite();
-
-	for (i in vertices) {
-		composite.particles.push(new Particle(vertices[i]));
-		if (i > 0)
-			composite.constraints.push(
-				new DistanceConstraint(
-					composite.particles[i],
-					composite.particles[i-1],
-					stiffness
-				)
-			);
-	}
-	if(circle){
-		composite.constraints.push(
-			new DistanceConstraint(
-				composite.particles[composite.particles.length-1],
-				composite.particles[0],
-				stiffness
-			)
-		)
-	}
-
-	this.composites.push(composite);
-	return composite;
-}
-
-VerletJS.prototype.cloth = function(origin, width, height, segments, pinMod, stiffness) {
-
-	var composite = new this.Composite();
-
-	var xStride = width/segments;
-	var yStride = height/segments;
-
-	var x,y;
-	for (y=0;y<segments;++y) {
-		for (x=0;x<segments;++x) {
-			var px = origin.x + x*xStride - width/2 + xStride/2;
-			var py = origin.y + y*yStride - height/2 + yStride/2;
-			composite.particles.push(new Particle(new Vec2(px, py)));
-
-			if (x > 0){
-				composite.constraints.push(
-					new DistanceConstraint(
-						composite.particles[y*segments+x],
-						composite.particles[y*segments+x-1],
-						stiffness
-					)
-				);
-			}
-
-			if (y > 0){
-				composite.constraints.push(
-					new DistanceConstraint(
-						composite.particles[y*segments+x],
-						composite.particles[(y-1)*segments+x],
-						stiffness
-					)
-				);
-			}
-		}
-	}
-
-	for (x=0;x<segments;++x) {
-		if (x%pinMod == 0)
-		composite.pin(x);
-	}
-
-	this.composites.push(composite);
-	return composite;
-}
-
-VerletJS.prototype.tire = function(origin, radius, segments, spokeStiffness, treadStiffness) {
-	var stride = (2*Math.PI)/segments;
-	var i;
-
-	var composite = new this.Composite();
-
-	// particles
-	for (i=0;i<segments;++i) {
-		var theta = i*stride;
-		composite.particles.push(new Particle(new Vec2(origin.x + Math.cos(theta)*radius, origin.y + Math.sin(theta)*radius)));
-	}
-
-	var center = new Particle(origin);
-	composite.particles.push(center);
-
-	// constraints
-	for (i=0;i<segments;++i) {
-		composite.constraints.push(
-			new DistanceConstraint(
-				composite.particles[i],
-				composite.particles[(i+1)%segments],
-				treadStiffness
-			)
-		);
-		composite.constraints.push(
-			new DistanceConstraint(
-				composite.particles[i],
-				center,
-				spokeStiffness
-			)
-		);
-		composite.constraints.push(
-			new DistanceConstraint(
-				composite.particles[i],
-				composite.particles[(i+5)%segments],
-				treadStiffness
-			)
-		);
-	}
-
-	this.composites.push(composite);
-	return composite;
-}
-
-},{"./constraint":5,"./verlet":4}],11:[function(require,module,exports){
+},{"./constraints/AngleConstraint":13,"./constraints/AreaConstraint":14,"./constraints/DistanceConstraint":11,"./constraints/InflateAreaConstraint":15,"./constraints/PinConstraint":12,"./structures/Vec2":7}],11:[function(require,module,exports){
 function DistanceConstraint(a, b, stiffness, distance /*optional*/) {
   this.a = a;
   this.b = b;
@@ -784,26 +554,287 @@ AngleConstraint.prototype.relax = function(stepCoef) {
 
   module.exports = AngleConstraint;
 
-},{}],9:[function(require,module,exports){
-var Vec2 = require("./Vec2")
+},{}],7:[function(require,module,exports){
 
-function Particle(pos) {
-  this.pos = (new Vec2()).set(pos);
-  this.lastPos = (new Vec2()).set(pos);
-  this.vel = new Vec2();
+/*
+Copyright 2013 Sub Protocol and other contributors
+http://subprotocol.com/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+// A simple 2-dimensional vector implementation
+
+module.exports = Vec2;
+
+function Vec2(x, y) {
+	this.x = x || 0;
+	this.y = y || 0;
+	var _this = this;
+	Object.defineProperty(this,"asArray",{
+		get:function(){
+			return [_this.x,_this.y];
+		}
+	});
+}
+var temp;
+temp = require("./to-value");
+
+for(var i in temp){
+	Vec2.prototype[i] = temp[i];
 }
 
-Particle.prototype.draw = function(ctx) {
-  ctx.beginPath();
-  ctx.arc(this.pos.x, this.pos.y, 2, 0, 2*Math.PI);
-  ctx.fillStyle = "#2dad8f";
-  ctx.fill();
+temp = require("./no-arg");
+
+for(var i in temp){
+	Vec2.prototype[i] = temp[i];
+}
+
+temp = require("./operations");
+
+for(var i in temp){
+	Vec2.prototype[i] = temp[i];
 }
 
 
-module.exports = Particle;
+Vec2.prototype.clone = function(){
+	return new Vec2(this.x,this.y);
+};
 
-},{"./Vec2":7}],10:[function(require,module,exports){
+Vec2.prototype.normal = function() {
+	var m = Math.sqrt(this.x*this.x + this.y*this.y);
+	return new Vec2(this.x/m, this.y/m);
+};
+
+Vec2.prototype.equals = function(v) {
+	return this.x == v.x && this.y == v.y;
+};
+
+Vec2.prototype.epsilonEquals = function(v, epsilon) {
+	return Math.abs(this.x - v.x) <= epsilon && Math.abs(this.y - v.y) <= epsilon;
+};
+
+Vec2.prototype.isNaN = function(){
+	if(isNaN(this.x)) return true;
+	if(isNaN(this.y)) return true;
+	return false;
+};
+
+Vec2.prototype.toString = function() {
+	return "(" + this.x + ", " + this.y + ")";
+};
+
+Vec2.prototype.toArray = function() {
+	return [this.x,this.y];
+};
+
+},{"./no-arg":17,"./operations":18,"./to-value":16}],16:[function(require,module,exports){
+
+var v = module.exports;
+
+v.length = function() {
+	return Math.sqrt(this.x*this.x + this.y*this.y);
+};
+
+v.length2 = function() {
+	return this.x*this.x + this.y*this.y;
+};
+
+v.slope = function(){
+	return this.y / this.x;
+};
+
+v.sum = function(){
+	return this.y + this.x;
+};
+
+v.dist = function(v) {
+	return Math.sqrt(this.dist2(v));
+};
+
+v.dist2 = function(v) {
+	var x = v.x - this.x;
+	var y = v.y - this.y;
+	return x*x + y*y;
+};
+
+v.dot = function(v) {
+	return this.x*v.x + this.y*v.y;
+};
+
+v.cross = function(v){
+	return this.x * v.y - this.y * v.x;
+};
+
+v.angle = function(vl,vr) {
+	if(vr) return this.angle2(vl,vr);
+	if(vl) return this.angle1(vl);
+	return Math.atan2(this.x,this.y);
+};
+
+v.angle1 = function(v) {
+	return Math.atan2(this.x*v.y-this.y*v.x,this.x*v.x+this.y*v.y);
+};
+
+v.angle2 = function(vLeft, vRight) {
+	return vLeft.clone().sub(this).angle(vRight.clone().sub(this));
+};
+
+},{}],17:[function(require,module,exports){
+var v = module.exports;
+
+v.zero = function(){
+	this.x = 0;
+	this.y = 0;
+	return this;
+};
+
+v.posinf = function(){
+	this.x = Number.POSITIVE_INFINITY;
+	this.y = Number.POSITIVE_INFINITY;
+	return this;
+};
+
+v.neginf = function(){
+	this.x = Number.NEGATIVE_INFINITY;
+	this.y = Number.NEGATIVE_INFINITY;
+	return this;
+};
+
+v.normalize = function(){
+	var len = this.length();
+	this.x /= len;
+	this.y /= len;
+	return this;
+};
+
+v.signum = function(){
+	this.x = this.x>0?1:this.x<0?-1:0;
+	this.y = this.y>0?1:this.y<0?-1:0;
+	return this;
+};
+
+v.swap = function() {
+	var temp = this.x;
+	this.x = this.y;
+	this.y = temp;
+	return this;
+};
+
+v.abs = function(){
+  this.x = Math.abs(this.x);
+  this.y = Math.abs(this.y);
+  return this;
+};
+
+},{}],18:[function(require,module,exports){
+var v = module.exports;
+
+v.add = function(v) {
+	this.x += v.x;
+	this.y += v.y;
+	return this;
+};
+
+v.sub = function(v){
+	this.x -= v.x;
+	this.y -= v.y;
+	return this;
+};
+
+v.mul = function(v) {
+	if(typeof v == "number"){
+		return this.scale(v);
+	}
+	this.x *= v.x;
+	this.y *= v.y;
+	return this;
+};
+
+v.div = function(v) {
+	if(typeof v == "number"){
+		return this.scale(1/v);
+	}
+	this.x /= v.x;
+	this.y /= v.y;
+	return this;
+};
+
+v.scale = function(coef) {
+	this.x *= coef;
+	this.y *= coef;
+	return this;
+};
+
+v.scaleI = function(coef) {
+	this.x /= coef;
+	this.y /= coef;
+	return this;
+};
+
+
+v.pow = function(num){
+	this.x = Math.pow(this.x,num);
+	this.y = Math.pow(this.y,num);
+	return this;
+};
+
+
+v.rotate = function(origin, theta) {
+	var x = this.x - origin.x;
+	var y = this.y - origin.y;
+	this.x = x*Math.cos(theta) - y*Math.sin(theta) + origin.x;
+	this.y = x*Math.sin(theta) + y*Math.cos(theta) + origin.y;
+	return this;
+};
+
+v.min = function(v){
+	this.x = Math.min(this.x, v.x);
+	this.y = Math.min(this.y, v.y);
+	return this;
+};
+
+v.mid = function(v){
+	this.x = (this.x+v.x)/2;
+	this.y = (this.y+v.y)/2;
+	return this;
+};
+
+v.max = function(v){
+	this.x = Math.max(this.x, v.x);
+	this.y = Math.max(this.y, v.y);
+	return this;
+};
+
+v.set = function(v,y) {
+  if(typeof y != "undefined"){
+    this.x = v;
+  	this.y = y;
+  }else{
+    this.x = v.x;
+  	this.y = v.y;
+  }
+	return this;
+};
+
+},{}],10:[function(require,module,exports){
 var AABB = require("./AABB");
 
 function Composite() {
@@ -824,7 +855,26 @@ Composite.prototype.pin = function(index, pos) {
 
 module.exports = Composite;
 
-},{"./AABB":16}],12:[function(require,module,exports){
+},{"./AABB":19}],9:[function(require,module,exports){
+var Vec2 = require("./Vec2")
+
+function Particle(pos) {
+  this.pos = (new Vec2()).set(pos);
+  this.lastPos = (new Vec2()).set(pos);
+  this.vel = new Vec2();
+}
+
+Particle.prototype.draw = function(ctx) {
+  ctx.beginPath();
+  ctx.arc(this.pos.x, this.pos.y, 2, 0, 2*Math.PI);
+  ctx.fillStyle = "#2dad8f";
+  ctx.fill();
+}
+
+
+module.exports = Particle;
+
+},{"./Vec2":7}],12:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2")
 
 function PinConstraint(a, pos) {
@@ -1075,7 +1125,7 @@ There are a few issues here
 
 */
 
-},{"../structures/AABB":16,"../structures/Polygon":18,"../structures/Triangle":17,"../structures/Vec2":7}],15:[function(require,module,exports){
+},{"../structures/AABB":19,"../structures/Polygon":21,"../structures/Triangle":20,"../structures/Vec2":7}],15:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
 var Line = require("../structures/Line");
 var Triangle = require("../structures/Triangle");
@@ -1279,45 +1329,42 @@ a/Sin(A) = b/Sin(B) = c/Sin(C)
 A = Sin(A)* Sin(C) * b^2 / (Sin(B)*Sin(90))
 */
 
-},{"../structures/AABB":16,"../structures/Line":19,"../structures/Polygon":18,"../structures/Triangle":17,"../structures/Vec2":7}],20:[function(require,module,exports){
+},{"../structures/AABB":19,"../structures/Line":22,"../structures/Polygon":21,"../structures/Triangle":20,"../structures/Vec2":7}],23:[function(require,module,exports){
 /*
 
-The High level of this explanation is
+  The High level of this explanation is
 
-1) Each particle is defined as
-  (position + velocity*time)
-2) Using this, I can create a linear equation from two particles where...
-  m = (positionA.y + velocityA.y*time) - (positionB.y + velocityB.y*time)
-    / (positionA.x + velocityA.x*time) - (positionB.x + velocityB.x*time)
-  and
-  b = (positionA.y + velocityA.y*time) - (positionA.x + velocityA.x*time)*m
+  1) Each particle is defined as
+    (position + velocity*time)
 
-3) Since I'm tring to find the exact time where a point is on a line, the equation
-    becomes
-  y = mx + b
-  (positionP.y + velocityP.y*time) = m*(positionP.x + velocityP.x*time) + b
+  2) Using this, I can create a linear equation from two particles where...
+    m = (positionA.y + velocityA.y*time) - (positionB.y + velocityB.y*time)
+      / (positionA.x + velocityA.x*time) - (positionB.x + velocityB.x*time)
+    and
+    b = (positionA.y + velocityA.y*time) - (positionA.x + velocityA.x*time)*m
 
-4) From here its about simplifying the equation until I get something solvable for time
-  I soon learned that the equation becomes a quadratic equation
-  a*time^2 + b*time + c
+  3) Since I'm tring to find the exact time where a point is on a line, the equation
+      becomes
+    y = mx + b
+    (positionP.y + velocityP.y*time) = m*(positionP.x + velocityP.x*time) + b
 
-4a)
-  as a result I can solve all the issue with
-  (-b (+||-) (b^2 - 4*a*c)^(1/2) ) / (2*a)
+  4) From here its about simplifying the equation until I get something solvable for time
+    I soon learned that the equation becomes a quadratic equation
+    a*time^2 + b*time + c
+  4a)
+    as a result I can solve all the issue with
+    (-b (+||-) (b^2 - 4*a*c)^(1/2) ) / (2*a)
+  4b) if a = 0, then the equation becomes even simpler
+    time = -c/b
+  4c) if b is 0 and a is 0, we have nothing.
 
-4b) if a = 0, then the equation becomes even simpler
-  time = -c/b
+  5) However, The times I'm looking for are specific.
+  5a) The time should be negative. I don't want to predict the future, I want to fix the past
+  5b) The time cannot be larger than the current timestep. If it is, we are looking too far back
+  5c) there may be a possibility that there are two times that fit our description.
+    as a result, we want to find the one that happened first. A simply Math.min works
 
-4c) if b is 0 and a is 0, we have nothing.
-
-5) However, The times I'm looking for are specific.
-
-5a) The time should be negative. I don't want to predict the future, I want to fix the past
-5b) The time cannot be larger than the current timestep. If it is, we are looking too far back
-5c) there may be a possibility that there are two times that fit our description.
-  as a result, we want to find the one that happened first. A simply Math.min works
-
-6) Return the value!
+  6) Return the value!
 
 */
 
@@ -1448,79 +1495,103 @@ time*time(
 //cross
 */
 
-},{}],21:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
+var Vel = require("./velocities.js");
 
-function getLineMass(){
-  console.log("need to get the net mass behind the line");
-  return 2;
+
+function getMassAtPoint(a,b,p){
+//  console.log("need to get the net mass behind the line");
+  /*
+    This can be based off liquid dynamics
+    This can also be based off baseball bats
+    This cannot be based off an average mass since the mass is actually the entire line
+    We will be doing baseball bat...
+  */
+  var td = a.pos.dist(b.pos);
+  //So the situation is like this
+  //The further away p is from the center point
+  //-the less mass a single side will have
+  //The Closer it is
+  //It will make no difference
+  var diff = p.pos.dist(a.pos)/td;
+  var m = 0;
+  m += getParticleMass(a)*(diff > 0.5)?1-diff:1;
+  m += getParticleMass(b)*(diff < 0.5?diff:1);
+  return m;
 }
 
-function getParticleMass(){
-  console.log("need to get the net mass behind the particle");
+function getElasticityAtPoint(a,b,p){
+//  console.log("need to get the net elasticity on the point");
+  var ad = a.pos.dist(p.pos);
+  var bd = b.pos.dist(p.pos);
+  return getParticleElasticity(a)*bd/(ad+bd) + getParticleElasticity(b) * ad/ (ad+bd);
+}
+
+
+function getParticleMass(p){
+//  console.log("need to get the net mass behind the particle");
   return 1;
 }
 
-function inelastic(){
-
+function getParticleElasticity(p){
+//  console.log("need to get the net elasticity behind the particle");
+  return 0;
 }
 
-function elastic(){
+
+function collide(p,lp,slope){
+  //Thank you http://www.euclideanspace.com/physics/dynamics/collision/twod/
+  var e = (p.elasticity+lp.elasticity)/2;
+  var ni = (1+e)*(p.mass*lp.mass)/(p.mass + lp.mass);
+  ni = slope.mul(p.vel.clone().sub(lp.vel).dot(slope)).mul(ni);
+
+  p.vel.sub(ni.div(p.mass));
+  lp.vel.sub(ni.div(lp.mass));
+}
+
+function getLiquidMassAtPoint(p,container){
 
 }
 
 function distributeVelocities(p,a,b,time){
+//  var vels = Vel.getVelocities(a,b,time);
   a.pos.add(a.vel.clone().scale(time));
   b.pos.add(b.vel.clone().scale(time));
   p.pos.add(p.vel.clone().scale(time));
+  p.mass= getParticleMass(p);
+  p.elasticity = getParticleElasticity(p);
+  var lp = {
+    pos:  p.pos.clone(),
+    vel:  Vel.getVelocityAtPoint(a,b,p),
+    mass: getMassAtPoint(a,b,p),
+    elasticity:getElasticityAtPoint(a,b,p)
+  };
+  var dir = getDirection(a,b,p,time);
+//  console.log(dir);
 
+  collide(p,lp,dir);
 
-  //I'm now finding the net velocity of the line at that point
-  var ab = a.pos.dist(b.pos);
-  var ap = a.pos.dist(p.pos);
-  var bp = b.pos.dist(p.pos);
-  //  console.log("ap: "+(ap/ab));
-  //  console.log("bp: "+(bp/ab));
-/*
-  alert(
-    "LineA{vel:"+a.vel+", pos:"+a.pos+"}\n"+
-    "LineB{vel:"+b.vel+", pos:"+b.pos+"}\n"+
-    "particle{vel:"+p.vel+", pos:"+p.pos+"}"
-  );
-  */
-  var netv = a.vel.clone().scale(bp/ab).add(b.vel.clone().scale(ap/ab));
-  //  console.log("avel: "+a.vel);
-  //  console.log("bvel: "+b.vel);
+  Vel.getVelocitiesFromPoint(a,b,lp);
+  a.pos.sub(a.vel.clone().scale(time));
+  b.pos.sub(b.vel.clone().scale(time));
+  p.pos.sub(p.vel.clone().scale(time));
 
-  //  console.log(p.pos);
+//  console.log(a,b,p);
 
-  //  console.log("netv: "+netv);
-  //now distributing momentum
-  p.vel.set(new Vec2(0,0));
-  a.vel.set(new Vec2(0,0));
-  b.vel.set(new Vec2(0,0));
-  /*
-  netv.scale(getLineMass())
-  .add(p.vel.clone().scale(getParticleMass()))
-  .scale(1/(getLineMass()+getParticleMass()));
+}
 
-  p.vel.set(netv);
-  //  console.log("netv`: "+netv);
-  a.vel.scale(ap/ab).add(p.vel.clone().scale(bp/ab));
-  b.vel.scale(bp/ab).add(p.vel.clone().scale(ap/ab));
-
-  //  console.log("avel`: "+a.vel);
-  //  console.log("bvel`: "+b.vel);
-
-  //now configuring new point
-  a.pos.add(a.vel.clone().scale(1-time));
-  b.pos.add(b.vel.clone().scale(1-time));
-  p.pos.add(p.vel.clone().scale(1-time));
-*/
+function getDirection(a,b,p,time){
+  var dir = a.pos.clone().sub(b.pos).swap();
+  var op = p.pos.clone().sub(b.pos).sub(p.vel.clone());
+  if(dir.mul(-1,1).dist(op) > dir.mul(-1,-1).dist(op)){
+    return dir.normalize();
+  }
+  return dir.mul(-1,-1).normalize();
 }
 
 module.exports.distributeVelocities = distributeVelocities;
 
-},{}],16:[function(require,module,exports){
+},{"./velocities.js":25}],19:[function(require,module,exports){
 var Vec2 = require("./Vec2");
 var Line = require("./Line");
 
@@ -1642,74 +1713,281 @@ AABB.prototype.intersectsCircle = function(c){
 
 module.exports = AABB;
 
-},{"./Line":19,"./Vec2":7}],19:[function(require,module,exports){
-var Vec2 = require("../Vec2");
+},{"./Line":22,"./Vec2":7}],25:[function(require,module,exports){
+
+function getVelocities(A1,B1,time){
+  //Getting the midpoint between the points before velocities
+  var M1 = A1.pos.clone().mid(B1.pos);
+  //Getting the "angle" before vels, if one is 0, we need to divide the other
+  var Ang1 = A1.pos.clone().sub(B1.pos);
+  //Getting the distance before vels
+  var D1 = A1.pos.dist(B1.pos);
+
+  //Getting the positions after velocities
+  var A2 = A1.pos.clone().add(A1.vel.clone().scale(time));
+  var B2 = B1.pos.clone().add(B1.vel.clone().scale(time));
+  //Getting the midpoint between the points after velocities
+  var M2 = A2.clone().mid(B2);
+  //Getting the "angle" after vels
+  var Ang2 = A2.clone().sub(B2);
+  //Getting the distance after vels
+  var D2 = A2.dist(B2);
 
 
-function Line(A,B){
-  if(A.equals(B))
-    throw new Error("cannot construct line when A == B");
-  this.A = A;
-  this.B = B;
+  //Linear Velocity is the difference between the midpoints
+  var linearvel = M2.clone().sub(M1);
 
-  this.angledSlope = A.clone().sub(B).normalize();
-  this.slope = this.angledSlope.scale(
-    Math.sign(this.angledSlope.x)||Math.sign(this.angledSlope.y)
-  );
-  this.inv_slope = (this.slope.y == 0)?false:this.slope.x/this.slope.y;
-  this.true_slope = (this.slope.x == 0)?false:this.slope.y/this.slope.x;
-  this.yint = (this.true_slope !== false)?-this.true_slope*A.x + A.y:false;
-  this.xint = (this.inv_slope !== false)?-this.inv_slope*A.y + A.x:false;
+  //Expanding Velocity is the velocity that is parrallel to the line
+  //Rotational velocity is the velocity that is perpendicular to the line
 
-  this.mid = A.clone().mid(B);
-  this.length2 = A.dist2(B);
-  this.length = Math.sqrt(this.length2);
-  this.cross = A.cross(B);
+  var A1_er_Vel = A1.vel.clone().sub(linearvel);
+  var B1_er_Vel = B1.vel.clone().sub(linearvel);
+
+
+
+  //expansion velocity is the difference between the distances
+  var expandvel = 0;
+  //Use law of cosigns to find the angular velocity?
+  var rotatevel = 0;
+
+  if(Math.abs(Ang1.angle() - Ang2.angle()) > 0.0001){
+    //we only worry about rotational vels if the slopes are different
+    //If it was real rotational velocity, this would not fly
+    //The Angle we're looking for is opposite of the distance between the new point and old
+    //The radius is the other two lengths
+    //I am aware this is not correct
+    rotatevel = Math.acos(1 - Math.pow(A2.dist(A1),2) / (Math.pow(D2,2)/2));
+  }
+  if(rotatevel === 0){
+    if(Math.abs(D2 - D1) > 0.000001){
+      //Normalized in resp00ect to A and M
+      //expansion velocity is the difference between the distances
+      expandvel = A1.pos.clone().sub(M1).div(D1).abs().mul(D2-D1);
+    }
+    //We don't need to worry about Expansive velocities if no change in rotation and distance
+  }else{
+    console.log("we have an angle?");
+    //technically expansive velocities are higly dependent on rotational
+    //But in reality, if there is a "rotational" vel
+    //there will be a expansive vel since "rotational" vel's actually cut through
+    //The radius because all velocities are linear
+  }
+
+
+  return {
+    cache:{
+      before:{a:A1,b:B1,m:M1,ang:Ang1,d:D1},
+      after:{a:A2,b:B2,m:M2,ang:Ang2,d:D2}
+    },
+    linearvel: linearvel,
+    expandvel: expandvel,
+    rotatevel: rotatevel
+  };
 }
 
-Line.prototype.toString = function(){
-  return "limits:["+A+","+B+"]," +
-  "intercepts:("+this.yint+","+thisxint+")";
-  "slope:("+this.slope+"), ";
+/*
+  net_vel.x*distance = parrallel_magnitude*net_slope.x +
+                    -1*perpendicular_magnitude*net_slope.y
+
+  net_vel.y*distance = parrallel_magnitude*net_slope.y +
+                    + perpendicular_magnitude*net_slope.x
+*/
+function getParallelVelocity(net_vel,net_slope){
+  var dist = net_slope.length();
+  //  var per = (net_slope.x*par - net_vel.x*dist)/net_slope.y;
+  //  var par*net_slope.y = net_vel.y*dist - net_slope.x*per
+  //  var par*net_slope.y = net_vel.y*dist - net_slope.x*(net_slope.x*par - net_vel.x*dist)/net_slope.y
+  //  var par*net_slope.y = net_vel.y*dist - net_slope.x/net_slope.y*(net_slope.x*par - net_vel.x*dist)
+  //  var par*net_slope.y = net_vel.y*dist - net_slope.x/net_slope.y*net_slope.x*par + net_slope.x/net_slope.y*net_vel.x*dist
+  //  var par*net_slope.y + net_slope.x/net_slope.y*net_slope.x*par = net_vel.y*dist + net_slope.x/net_slope.y*net_vel.x*dist
+  //  var par(net_slope.y + net_slope.x*net_slope.x/net_slope.y) = net_vel.y*dist + net_slope.x/net_slope.y*net_vel.x*dist
+  //  var par(net_slope.y + net_slope.x*net_slope.x/net_slope.y) = net_vel.y*dist + net_vel.x*dist*net_slope.x/net_slope.y
+  //  var par(net_slope.y + net_slope.x*net_slope.x/net_slope.y) = dist*(net_vel.y + net_vel.x*net_slope.x/net_slope.y)
+  //  var par = dist*(net_vel.y + net_vel.x*net_slope.x/net_slope.y)/(net_slope.y + net_slope.x*net_slope.x/net_slope.y)
+  //  var par = dist*net_slop.y(net_vel.y + net_vel.x*net_slope.x/net_slope.y)/(net_slope.y*net_slope.y + net_slope.y*net_slope.x*net_slope.x/net_slope.y)
+  //  var par = dist*(net_vel.y*net_slop.y + net_vel.x*net_slope.x)/(net_slope.y*net_slope.y + net_slope.x*net_slope.x)
+  //  var par = dist*(net_vel.y*net_slop.y + net_vel.x*net_slope.x)/(net_slope.y^2 + net_slope.x^2)
+
 }
 
-var interesctions = require("./intersects.js");
+/*
+net_vel.x*distance = parrallel_magnitude*net_slope.x +
+                  -1*perpendicular_magnitude*net_slope.y
 
-for(var i in interesctions){
-  Line.prototype[i] = interesctions[i];
+net_vel.y*distance = parrallel_magnitude*net_slope.y +
+                  + perpendicular_magnitude*net_slope.x
+*/
+
+function getPerpendicularVelocity(net_vel,net_slope){
+  var dist = net_slope.length();
+//  var par = (net_vel.x*dist + net_slope.y*per)/net_slope.x;
+//  var net_slope.x*per = net_vel.y*dist - net_slope.y*par;
+//  var net_slope.x*per = net_vel.y*dist - net_slope.y*(net_vel.x*dist + net_slope.y*per)/net_slope.x;
+//  var net_slope.x*per = net_vel.y*dist - net_slope.y/net_slope.x*(net_vel.x*dist + net_slope.y*per);
+//  var net_slope.x*per = net_vel.y*dist - net_vel.x*dist*net_slope.y/net_slope.x - net_slope.y*per*net_slope.y/net_slope.x;
+//  var net_slope.x*per + net_slope.y*per*net_slope.y/net_slope.x = net_vel.y*dist - net_vel.x*dist*net_slope.y/net_slope.x;
+//  var per*(net_slope.x + net_slope.y*net_slope.y/net_slope.x) = net_vel.y*dist - net_vel.x*dist*net_slope.y/net_slope.x;
+//  var per*net_slope.x*(net_slope.x + net_slope.y*net_slope.y/net_slope.x) = net_vel.y*dist*net_slope.x - net_vel.x*dist*net_slope.y;
+//  var per*(net_slope.x*net_slope.x + net_slope.y*net_slope.y) = net_vel.y*dist*net_slope.x - net_vel.x*dist*net_slope.y;
+//  var per = (net_vel.y*dist*net_slope.x - net_vel.x*dist*net_slope.y)/(net_slope.x*net_slope.x + net_slope.y*net_slope.y);
+//  var per = dist*(net_vel.y*net_slope.x - net_vel.x*net_slope.y)/(net_slope.x^2 + net_slope.y^2);
+
 }
-var eq = require("./questions.js");
 
-for(var i in eq){
-  Line.prototype[i] = eq[i];
+
+function getNetVelocityAtPoint(P1,vels){
+  var M1 = vels.cache.before.m;
+  var PD1 = P1.dist(M1);
+  var D1 = vels.cache.before.d;
+  var vel = vels.linearvel.clone();
+  if(vels.rotatevel === 0){
+    if(vels.expandvel === 0) return vel;
+    return vel.add(vels.expandvel.mul(P1.clone().sub(M1).signum())*PD1*2/D1);
+  }
 }
 
-//This should be in cacheable
-Line.prototype.perpendicularBisector = function(){
-  var mid = this.mid;
-  var A = this.A.clone().sub(mid).swap();
-  var B = A.clone();
-  A.y *= -1
-  B.x *= -1;
-  A.add(mid);
-  B.add(mid);
-  return new Line(A,B);
+function getVelocityAtPoint(A,B,P){
+  var ad = A.pos.dist(P.pos);
+  var bd = B.pos.dist(P.pos);
+  return A.vel.clone().mul(bd).div(ad+bd).add(B.vel.clone().mul(ad).div(ad+bd));
 }
 
-Line.prototype.getYValue = function(x){
-  if(!this.slope.x) return false;
-  return  x*this.true_slope + this.yint;
-};
+function getVelocitiesFromPoint(A,B,P){
+  var ad = A.pos.dist(P.pos);
+  var bd = B.pos.dist(P.pos);
+  var nd = ad+bd;
+  //
+//  A = (ad+bd)*(P - B.vel.clone().mul(ad).div(ad+bd))/bd;
+//  B = (ad+bd)*(P - A.vel.clone().mul(bd).div(ad+bd))/ad;
 
-Line.prototype.getXValue = function(y){
-  if(!this.slope.y) return false;
-  return  y*this.inv_slope + this.xint;
-};
+  A.vel.mul(ad).div(nd).add(P.vel.mul(bd).div(nd));
+  B.vel.mul(bd).div(nd).add(P.vel.mul(ad).div(nd));
+}
 
 
-module.exports = Line;
+module.exports.getVelocityAtPoint = getVelocityAtPoint;
+module.exports.getVelocitiesFromPoint = getVelocitiesFromPoint;
+module.exports.getNetVelocityAtPoint = getNetVelocityAtPoint;
+module.exports.getVelocities = getVelocities;
 
-},{"../Vec2":7,"./intersects.js":22,"./questions.js":23}],8:[function(require,module,exports){
+/*
+  We have the angle of the Line between point A and B
+  we must then understand how much of the velocity at point A is
+    -perpendicular
+    -parrallel
+
+  Parrellel line's definition assumes
+    -The angle between the two lines are 0 or 180
+    -the slope of the lines are equal
+    -the vector's of the line can be
+      - (-x, -slope*x) or (x, slope*x)
+      - (-y/slope, -y) or (y/slope, y)
+
+  Perpendicular line's definition assumes
+    -The angle between the two lines are 90 or 270
+    -The slope of the lines are -1*(x/y)
+    -The vector's of the line can be
+      - (-slope*x, -x) or (slope*x, x)
+      - (-y, -y/slope) or (y, y/slope)
+
+  f(net_vel) = parrallel_magnitude*normal_slope + perpendicular_magnitude*normal_slope
+
+  normal_slope = net_slope/distance
+
+  f(net_vel)  = parrallel_magnitude*net_slope/distance
+              + perpendicular_magnitude*net_slope_swapped/distance
+
+  net_vel = parrallel_magnitude*net_slope/distance
+          + perpendicular_magnitude*net_slope_swapped/distance
+
+  net_vel*distance = parrallel_magnitude*net_slope
+                    + perpendicular_magnitude*-1*net_slope_swapped
+
+
+  net_vel.x*distance = parrallel_magnitude*net_slope.x +
+                    + perpendicular_magnitude*-1*net_slope.y
+
+  net_vel.y*distance = parrallel_magnitude*net_slope.y +
+                    + perpendicular_magnitude*net_slope.x
+
+  perpendicular_magnitude = (net_vel.y*distance - parrallel_magnitude*net_slope.y)/net_slope.x
+
+  net_vel.x*distance  =
+    parrallel_magnitude*net_slope.x -
+    net_slope.y*(net_vel.y*distance - parrallel_magnitude*net_slope.y)/net_slope.x
+
+  net_vel.x*distance  =
+    parrallel_magnitude*net_slope.x -
+    net_slope.y/net_slope.x*(net_vel.y*distance - parrallel_magnitude*net_slope.y)
+
+  net_vel.x*distance  =
+    parrallel_magnitude*net_slope.x -
+    net_slope.y/net_slope.x*net_vel.y*distance
+    + net_slope.y/net_slope.x*parrallel_magnitude*net_slope.y
+
+    net_vel.x*distance + net_slope.y/net_slope.x*net_vel.y*distance
+  =
+    parrallel_magnitude(net_slope.x + net_slope.y*net_slope.y/net_slope.x)
+
+    parrallel_magnitude
+  =
+    net_vel.x*distance + net_slope.y/net_slope.x*net_vel.y*distance
+    /(net_slope.x - + net_slope.y*net_slope.y/net_slope.x)
+
+
+  parrallel_magnitude = (net_vel.y*distance - perpendicular_magnitude*net_slope.x)
+  /net_slope.y
+
+  net_vel.x*distance = (net_vel.y*distance - perpendicular_magnitude*net_slope.x)
+                    /net_slope.y
+                    + perpendicular_magnitude*-1*net_slope.y
+
+  net_vel.x*distance =
+    net_vel.y*distance/net_slope.y
+    - perpendicular_magnitude*net_slope.x/net_slope.y
+    + perpendicular_magnitude*-1*net_slope.y
+
+  net_vel.x*distance - net_vel.y*distance/net_slope.y =
+  -1*(net_slope.x/net_slope.y + net_slope.y)
+  * perpendicular_magnitude
+
+  perpendicular_magnitude =
+    (net_vel.x*distance - net_vel.y*distance/net_slope.y)
+    / -1*(net_slope.x/net_slope.y + net_slope.y)
+
+  perpendicular_magnitude =
+    distance*(net_vel.x - net_vel.y/net_slope.y)
+    / (-1*(net_slope.x/net_slope.y + net_slope.y))
+
+
+  perpendicular_magnitude =
+    distance*(net_vel.x - net_vel.y/net_slope.y)
+    / (-1*(net_slope.x/net_slope.y + net_slope.y))
+
+
+  parrallel_magnitude =
+    (
+      net_vel.y*distance -
+      (
+        distance*(net_vel.x - net_vel.y/net_slope.y)
+        / (-1*(net_slope.x/net_slope.y + net_slope.y))
+      )*net_slope.x
+    )/net_slope.y
+
+  parrallel_magnitude =
+    distance*(
+      net_vel.y -
+      (
+        (net_vel.x - net_vel.y/net_slope.y)
+        / (-1*(net_slope.x/net_slope.y + net_slope.y))
+      )*net_slope.x
+    )/net_slope.y
+
+
+
+*/
+
+},{}],8:[function(require,module,exports){
 var AABB = require("../structures/AABB");
 var Line = require("../structures/Line");
 var boxIntersect = require("box-intersect");
@@ -1794,7 +2072,7 @@ function runCollision(p,a,b,timestep){
 
 module.exports = toExport;
 
-},{"../structures/AABB":16,"../structures/Line":19,"./momentum":21,"./time":20,"box-intersect":24}],18:[function(require,module,exports){
+},{"../structures/AABB":19,"../structures/Line":22,"./momentum":24,"./time":23,"box-intersect":26}],21:[function(require,module,exports){
 function Polygon(oPoints){
   var l = oPoints.length;
   var i = l;
@@ -1844,7 +2122,74 @@ for(var i in intersects){
 
 module.exports = Polygon;
 
-},{"./cacheable":26,"./intersects":25}],23:[function(require,module,exports){
+},{"./cacheable":27,"./intersects":28}],22:[function(require,module,exports){
+var Vec2 = require("../Vec2");
+
+
+function Line(A,B){
+  if(A.equals(B))
+    throw new Error("cannot construct line when A == B");
+  this.A = A;
+  this.B = B;
+
+  this.angledSlope = A.clone().sub(B).normalize();
+  this.slope = this.angledSlope.scale(
+    Math.sign(this.angledSlope.x)||Math.sign(this.angledSlope.y)
+  );
+  this.inv_slope = (this.slope.y == 0)?false:this.slope.x/this.slope.y;
+  this.true_slope = (this.slope.x == 0)?false:this.slope.y/this.slope.x;
+  this.yint = (this.true_slope !== false)?-this.true_slope*A.x + A.y:false;
+  this.xint = (this.inv_slope !== false)?-this.inv_slope*A.y + A.x:false;
+
+  this.mid = A.clone().mid(B);
+  this.length2 = A.dist2(B);
+  this.length = Math.sqrt(this.length2);
+  this.cross = A.cross(B);
+}
+
+Line.prototype.toString = function(){
+  return "limits:["+A+","+B+"]," +
+  "intercepts:("+this.yint+","+thisxint+")";
+  "slope:("+this.slope+"), ";
+}
+
+var interesctions = require("./intersects.js");
+
+for(var i in interesctions){
+  Line.prototype[i] = interesctions[i];
+}
+var eq = require("./questions.js");
+
+for(var i in eq){
+  Line.prototype[i] = eq[i];
+}
+
+//This should be in cacheable
+Line.prototype.perpendicularBisector = function(){
+  var mid = this.mid;
+  var A = this.A.clone().sub(mid).swap();
+  var B = A.clone();
+  A.y *= -1
+  B.x *= -1;
+  A.add(mid);
+  B.add(mid);
+  return new Line(A,B);
+}
+
+Line.prototype.getYValue = function(x){
+  if(!this.slope.x) return false;
+  return  x*this.true_slope + this.yint;
+};
+
+Line.prototype.getXValue = function(y){
+  if(!this.slope.y) return false;
+  return  y*this.inv_slope + this.xint;
+};
+
+
+module.exports = Line;
+
+},{"../Vec2":7,"./intersects.js":29,"./questions.js":30}],30:[function(require,module,exports){
 var Line = {};
 
 Line.equals = function(line){
@@ -1882,7 +2227,7 @@ Line.epsilonEqualMagnitude = function(line, epsilon) {
 
 module.exports =  Line;
 
-},{}],17:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = require("../Line");
 
@@ -1924,7 +2269,7 @@ Triangle.prototype.getConcaveBisector = cacheable.getConcaveBisector;
 
 module.exports = Triangle;
 
-},{"../Line":19,"../Vec2":7,"./cacheable.js":29,"./intersects.js":27,"./questions.js":28}],27:[function(require,module,exports){
+},{"../Line":22,"../Vec2":7,"./cacheable.js":33,"./intersects.js":31,"./questions.js":32}],31:[function(require,module,exports){
 var Triangle = {};
 
 Triangle.hasPoint = function(point){
@@ -1952,7 +2297,7 @@ Triangle.hasPoint = function(point){
 
 module.exports = Triangle;
 
-},{}],28:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 
 var Triangle = {};
 
@@ -2023,7 +2368,7 @@ Triangle.equalAngles = function(tri) {
 
 module.exports = Triangle;
 
-},{}],29:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 var Triangle = {};
 
 Triangle.getConcaveBisector = function(){
@@ -2059,7 +2404,7 @@ Triangle.area = function(){
 
 module.exports = Triangle;
 
-},{}],22:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = {};
 
@@ -2115,42 +2460,6 @@ Line.intersectsPoint = function(p){
 module.exports = Line;
 
 },{"../Vec2":7}],26:[function(require,module,exports){
-var Vec2 = require("../Vec2");
-
-
-var Polygon = {};
-
-Polygon.getMidPoint = function(){
-  var l = this.length;
-  var mid = new Vec2();
-  for(var i=this.length;i--;){
-    mid.add(this[i].clone().scale(1/l));
-  };
-  return mid;
-}
-
-Polygon.getArea = function(){
-  var net = 0;
-  //http://www.wikihow.com/Calculate-the-Area-of-a-Polygon
-  this.forThree(function(a,b,c){
-    net += b.cross(c);
-  })
-  return net;
-}
-
-Polygon.getAABB = function(){
-  var max = new Vec2(Number.NEGATIVE_INFINITY,Number.NEGATIVE_INFINITY);
-  var min = new Vec2(Number.POSITIVE_INFINITY,Number.POSITIVE_INFINITY);
-  for(var i=this.length;i--;){
-    max.max(this[i]);
-    min.min(this[i]);
-  }
-  return {max:max,min:min};
-}
-
-module.exports = Polygon
-
-},{"../Vec2":7}],24:[function(require,module,exports){
 'use strict'
 
 module.exports = boxIntersectWrapper
@@ -2279,7 +2588,43 @@ function boxIntersectWrapper(arg0, arg1, arg2) {
       throw new Error('box-intersect: Invalid arguments')
   }
 }
-},{"./lib/intersect":31,"./lib/sweep":30,"typedarray-pool":32}],25:[function(require,module,exports){
+},{"./lib/intersect":35,"./lib/sweep":34,"typedarray-pool":36}],27:[function(require,module,exports){
+var Vec2 = require("../Vec2");
+
+
+var Polygon = {};
+
+Polygon.getMidPoint = function(){
+  var l = this.length;
+  var mid = new Vec2();
+  for(var i=this.length;i--;){
+    mid.add(this[i].clone().scale(1/l));
+  };
+  return mid;
+}
+
+Polygon.getArea = function(){
+  var net = 0;
+  //http://www.wikihow.com/Calculate-the-Area-of-a-Polygon
+  this.forThree(function(a,b,c){
+    net += b.cross(c);
+  })
+  return net;
+}
+
+Polygon.getAABB = function(){
+  var max = new Vec2(Number.NEGATIVE_INFINITY,Number.NEGATIVE_INFINITY);
+  var min = new Vec2(Number.POSITIVE_INFINITY,Number.POSITIVE_INFINITY);
+  for(var i=this.length;i--;){
+    max.max(this[i]);
+    min.min(this[i]);
+  }
+  return {max:max,min:min};
+}
+
+module.exports = Polygon
+
+},{"../Vec2":7}],28:[function(require,module,exports){
 var AABB = require("../AABB")
 var Line = require("../Line");
 var Polygon = {};
@@ -2321,7 +2666,7 @@ Polygon.intersectsLine = function(line,skip){
 }
 module.exports = Polygon;
 
-},{"../AABB":16,"../Line":19}],33:[function(require,module,exports){
+},{"../AABB":19,"../Line":22}],37:[function(require,module,exports){
 'use strict';
 
 //This code is extracted from ndarray-sort
@@ -2558,7 +2903,7 @@ function quickSort(left, right, data) {
     quickSort(less, great, data);
   }
 }
-},{}],34:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 'use strict'
 
 var DIMENSION   = 'd'
@@ -2703,7 +3048,7 @@ function bruteForcePlanner(full) {
 
 exports.partial = bruteForcePlanner(false)
 exports.full    = bruteForcePlanner(true)
-},{}],35:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 'use strict'
 
 module.exports = genPartition
@@ -2724,7 +3069,7 @@ function genPartition(predicate, args) {
         .replace('$', predicate))
   return Function.apply(void 0, fargs)
 }
-},{}],30:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 (function(){'use strict'
 
 module.exports = {
@@ -3160,7 +3505,7 @@ red_loop:
   }
 }
 })()
-},{"./sort":33,"bit-twiddle":36,"typedarray-pool":32}],31:[function(require,module,exports){
+},{"./sort":37,"bit-twiddle":40,"typedarray-pool":36}],35:[function(require,module,exports){
 'use strict'
 
 module.exports = boxIntersectIter
@@ -3655,7 +4000,7 @@ function boxIntersectIter(
     }
   }
 }
-},{"./brute":34,"./median":37,"./partition":35,"./sweep":30,"bit-twiddle":36,"typedarray-pool":32}],37:[function(require,module,exports){
+},{"./brute":38,"./median":41,"./partition":39,"./sweep":34,"bit-twiddle":40,"typedarray-pool":36}],41:[function(require,module,exports){
 'use strict'
 
 module.exports = findMedian
@@ -3798,7 +4143,7 @@ function findMedian(d, axis, start, end, boxes, ids) {
     start, mid, boxes, ids,
     boxes[elemSize*mid+axis])
 }
-},{"./partition":35}],38:[function(require,module,exports){
+},{"./partition":39}],42:[function(require,module,exports){
 "use strict"
 
 function dupe_array(count, value, i) {
@@ -3848,7 +4193,7 @@ function dupe(count, value) {
 }
 
 module.exports = dupe
-},{}],36:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 /**
  * Bit twiddling hacks for JavaScript.
  *
@@ -4054,7 +4399,7 @@ exports.nextCombination = function(v) {
 }
 
 
-},{}],39:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 require=(function(e,t,n,r){function i(r){if(!n[r]){if(!t[r]){if(e)return e(r);throw new Error("Cannot find module '"+r+"'")}var s=n[r]={exports:{}};t[r][0](function(e){var n=t[r][1][e];return i(n?n:e)},s,s.exports)}return n[r].exports}for(var s=0;s<r.length;s++)i(r[s]);return i})(typeof require!=="undefined"&&require,{1:[function(require,module,exports){
 exports.readIEEE754 = function(buffer, offset, isBE, mLen, nBytes) {
   var e, m,
@@ -7919,7 +8264,7 @@ SlowBuffer.prototype.writeDoubleBE = Buffer.prototype.writeDoubleBE;
 },{}]},{},[])
 ;;module.exports=require("buffer-browserify")
 
-},{}],32:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 (function(Buffer,global){'use strict'
 
 var bits = require('bit-twiddle')
@@ -8135,5 +8480,5 @@ exports.clearCache = function clearCache() {
   }
 }
 })(require("__browserify_buffer").Buffer,window)
-},{"__browserify_buffer":39,"bit-twiddle":36,"dup":38}]},{},[1])
+},{"__browserify_buffer":43,"bit-twiddle":40,"dup":42}]},{},[1])
 ;

@@ -28,8 +28,8 @@ function runTest(cb){
           next();
         }
       );
-    },function(){
-      cb(clean);
+    },function(e){
+      cb(e,clean);
     }
   );
 }
