@@ -1540,13 +1540,25 @@ function getParticleElasticity(p){
 
 
 function collide(p,lp,slope){
-  //Thank you http://www.euclideanspace.com/physics/dynamics/collision/twod/
   var e = (p.elasticity+lp.elasticity)/2;
+  var netvel = p.vel.clone().mul(p.mass).add(lp.vel.clone().mul(lp.mass));
+  netvel.div(p.mass+lp.mass);
+  p.vel.set(netvel);
+  lp.vel.set(netvel);
+  /*
+  //Thank you http://www.euclideanspace.com/physics/dynamics/collision/twod/
+  //Well, you didn't quite work out
   var ni = (1+e)*(p.mass*lp.mass)/(p.mass + lp.mass);
   ni = slope.mul(p.vel.clone().sub(lp.vel).dot(slope)).mul(ni);
 
-  p.vel.sub(ni.div(p.mass));
-  lp.vel.sub(ni.div(lp.mass));
+  console.log(p,lp);
+  console.log(ni.clone().div(p.mass));
+  console.log(ni.clone().div(lp.mass));
+  p.vel.sub(ni.clone().div(p.mass));
+  lp.vel.sub(ni.clone().div(lp.mass));
+  console.log(ni);
+  console.log(p,lp);
+  */
 }
 
 function getLiquidMassAtPoint(p,container){
@@ -1854,14 +1866,24 @@ function getVelocityAtPoint(A,B,P){
 
 function getVelocitiesFromPoint(A,B,P){
   var ad = A.pos.dist(P.pos);
+  var diff = ad/A.pos.dist(B.pos);
+  /*
+  //This is not correct
   var bd = B.pos.dist(P.pos);
   var nd = ad+bd;
-  //
-//  A = (ad+bd)*(P - B.vel.clone().mul(ad).div(ad+bd))/bd;
-//  B = (ad+bd)*(P - A.vel.clone().mul(bd).div(ad+bd))/ad;
+  A.vel.mul(ad).div(nd).add(P.vel.clone().mul(bd).div(nd));
+  B.vel.mul(bd).div(nd).add(P.vel.clone().mul(ad).div(nd));
+  */
+  var adiff = diff > 0.5?1-diff:1;
+  A.vel.mul(1-adiff).add(P.vel.clone().mul(adiff));
+  var bdiff = diff < 0.5?diff:1;
+  B.vel.mul(1-bdiff).add(P.vel.clone().mul(bdiff));
 
-  A.vel.mul(ad).div(nd).add(P.vel.mul(bd).div(nd));
-  B.vel.mul(bd).div(nd).add(P.vel.mul(ad).div(nd));
+/*  var m = 0;
+  m += getParticleMass(a)*(diff > 0.5)?1-diff:1;
+  m += getParticleMass(b)*(diff < 0.5?diff:1);
+  return m;
+  */
 }
 
 
