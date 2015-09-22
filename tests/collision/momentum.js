@@ -27,7 +27,9 @@ var particle = {
 var t = Time.getImpacts(particle, lineA, lineB);
 t = Time.restrict(t,1);
 Momentum.distributeVelocities(particle,lineA,lineB, t);
-console.log(particle,lineA,lineB);
+console.log("particle", particle);
+console.log("lineA",lineA);
+console.log("lineB",lineB);
 assert("Hit middle of line",
 particle.vel.equals(new Vec2(0,-1/3)) &&
 lineA.vel.equals(new Vec2(2,-1/3)) &&

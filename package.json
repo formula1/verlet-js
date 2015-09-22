@@ -29,7 +29,8 @@
     "url": "https://github.com/subprotocol/verlet-js/issues"
   },
   "dependencies": {
-    "box-intersect": "^1.0.0"
+    "box-intersect": "^1.0.0",
+    "formula1-array-util": "^1.0.0"
   },
   "devDependencies": {
     "node-watch": "latest",
