@@ -3,21 +3,27 @@
 //this exports all the verlet methods globally, so that the demos work.
 
 require("./verlet-polyfill");
-var VerletDraw = require('./verlet-draw')
-var VerletJS = require('./verlet')
-var constraint = require('./constraint')
-								 require('./objects') //patches VerletJS.prototype (bad)
-window.Vec2 = require('./structures/Vec2')
-window.VerletJS = VerletJS
-window.VerletDraw = VerletDraw;
 
-window.Particle = VerletJS.Particle
+var VerletJS = require('./verlet');
+var constraint = require('./constraint');
+                 require('./objects'); //patches VerletJS.prototype (bad)
+window.Vec2 = require('./structures/Vec2');
+window.VerletJS = VerletJS;
+
+Object.defineProperty(window,'VerletDraw',{
+  get:function(){return require('./draw/canvas');}
+});
+Object.defineProperty(window,'VerletSVGDraw',{
+  get:function(){return require('./draw/svg');}
+});
+
+window.Particle = VerletJS.Particle;
 
 for(var i in constraint){
-	window[i] = constraint[i]
+  window[i] = constraint[i];
 }
 
-},{"./constraint":5,"./objects":6,"./structures/Vec2":7,"./verlet":4,"./verlet-draw":3,"./verlet-polyfill":2}],2:[function(require,module,exports){
+},{"./constraint":4,"./draw/canvas":7,"./draw/svg":8,"./objects":5,"./structures/Vec2":6,"./verlet":3,"./verlet-polyfill":2}],2:[function(require,module,exports){
 if(!Math.sign){
   Math.sign = function(x){
     if( +x === x ) { // check if a number was given
@@ -50,107 +56,7 @@ if(!Math.lawCos){
   }
 }
 
-},{}],3:[function(require,module,exports){
-
-window.requestAnimFrame = window.requestAnimationFrame ||
-  window.webkitRequestAnimationFrame ||
-  window.mozRequestAnimationFrame ||
-  window.oRequestAnimationFrame ||
-  window.msRequestAnimationFrame ||
-  function(callback) {
-    window.setTimeout(callback, 1000 / 60);
-  };
-var VerletJS = require("./verlet.js");
-module.exports = VerletDraw;
-
-function VerletDraw(width, height, canvas, physics) {
-  this.width = width;
-  this.height = height;
-  this.canvas = canvas;
-  this.ctx = canvas.getContext("2d");
-  this.mouse = new Vec2(0,0);
-  this.mouseDown = false;
-  this.draggedEntity = null;
-  this.selectionRadius = 20;
-  this.highlightColor = "#4f545c";
-  this.physics = (!physics)?new VerletJS(width,height):physics;
-
-  var _this = this;
-
-  this.physics.logic = function(){
-    // handle dragging of entities
-    if (_this.draggedEntity)
-      _this.draggedEntity.pos.set(_this.mouse);
-  };
-
-
-  // prevent context menu
-  this.canvas.oncontextmenu = function(e) {
-    e.preventDefault();
-  };
-
-  this.canvas.onmousedown = function(e) {
-    _this.mouseDown = true;
-    var nearest = _this.physics.nearestEntity(_this.mouse,_this.selectionRadius);
-    if (nearest) {
-      _this.draggedEntity = nearest;
-      console.log(nearest.pos);
-    }
-  };
-
-  this.canvas.onmouseup = function(e) {
-    _this.mouseDown = false;
-    _this.draggedEntity = null;
-  };
-
-  this.canvas.onmousemove = function(e) {
-    var rect = _this.canvas.getBoundingClientRect();
-    _this.mouse.x = e.clientX - rect.left;
-    _this.mouse.y = e.clientY - rect.top;
-  };
-
-}
-
-
-VerletDraw.prototype.draw = function() {
-  var i, c;
-
-  this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-  var composites = this.physics.composites;
-  for (c in composites) {
-    // draw constraints
-    if (composites[c].drawConstraints) {
-      composites[c].drawConstraints(this.ctx, composites[c]);
-    } else {
-      var constraints = composites[c].constraints;
-      for (i in constraints)
-        constraints[i].draw(this.ctx);
-    }
-
-    // draw particles
-    if (composites[c].drawParticles) {
-      composites[c].drawParticles(this.ctx, composites[c]);
-    } else {
-      var particles = composites[c].particles;
-      for (i in particles)
-        particles[i].draw(this.ctx);
-    }
-
-    if(composites[c].draw) composites[c].draw(this.ctx);
-
-  }
-
-  // highlight nearest / dragged entity
-  var nearest = this.draggedEntity || this.physics.nearestEntity(this.mouse,this.selectionRadius);
-  if (nearest) {
-    this.ctx.beginPath();
-    this.ctx.arc(nearest.pos.x, nearest.pos.y, 8, 0, 2*Math.PI);
-    this.ctx.strokeStyle = this.highlightColor;
-    this.ctx.stroke();
-  }
-};
-
-},{"./verlet.js":4}],6:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -178,138 +84,138 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // generic verlet entities
 
-var VerletJS = require('./verlet')
-var Particle = VerletJS.Particle
-var constraints = require('./constraint')
-var DistanceConstraint = constraints.DistanceConstraint
+var VerletJS = require('./verlet');
+var Particle = VerletJS.Particle;
+var constraints = require('./constraint');
+var DistanceConstraint = constraints.DistanceConstraint;
 
 VerletJS.prototype.point = function(pos) {
-	var composite = new this.Composite();
-	composite.particles.push(new Particle(pos));
-	this.composites.push(composite);
-	return composite;
-}
+  var composite = new this.Composite();
+  composite.particles.push(new Particle(pos));
+  this.composites.push(composite);
+  return composite;
+};
 
 VerletJS.prototype.lineSegments = function(vertices, stiffness, circle) {
-	var i;
+  var i;
 
-	var composite = new this.Composite();
+  var composite = new this.Composite();
 
-	for (i in vertices) {
-		composite.particles.push(new Particle(vertices[i]));
-		if (i > 0)
-			composite.constraints.push(
-				new DistanceConstraint(
-					composite.particles[i],
-					composite.particles[i-1],
-					stiffness
-				)
-			);
-	}
-	if(circle){
-		composite.constraints.push(
-			new DistanceConstraint(
-				composite.particles[composite.particles.length-1],
-				composite.particles[0],
-				stiffness
-			)
-		)
-	}
+  for (i in vertices) {
+    composite.particles.push(new Particle(vertices[i]));
+    if (i > 0)
+      composite.constraints.push(
+        new DistanceConstraint(
+          composite.particles[i],
+          composite.particles[i-1],
+          stiffness
+        )
+      );
+  }
+  if(circle){
+    composite.constraints.push(
+      new DistanceConstraint(
+        composite.particles[composite.particles.length-1],
+        composite.particles[0],
+        stiffness
+      )
+    );
+  }
 
-	this.composites.push(composite);
-	return composite;
-}
+  this.composites.push(composite);
+  return composite;
+};
 
 VerletJS.prototype.cloth = function(origin, width, height, segments, pinMod, stiffness) {
 
-	var composite = new this.Composite();
+  var composite = new this.Composite();
 
-	var xStride = width/segments;
-	var yStride = height/segments;
+  var xStride = width/segments;
+  var yStride = height/segments;
 
-	var x,y;
-	for (y=0;y<segments;++y) {
-		for (x=0;x<segments;++x) {
-			var px = origin.x + x*xStride - width/2 + xStride/2;
-			var py = origin.y + y*yStride - height/2 + yStride/2;
-			composite.particles.push(new Particle(new Vec2(px, py)));
+  var x,y;
+  for (y=0;y<segments;++y) {
+    for (x=0;x<segments;++x) {
+      var px = origin.x + x*xStride - width/2 + xStride/2;
+      var py = origin.y + y*yStride - height/2 + yStride/2;
+      composite.particles.push(new Particle(new Vec2(px, py)));
 
-			if (x > 0){
-				composite.constraints.push(
-					new DistanceConstraint(
-						composite.particles[y*segments+x],
-						composite.particles[y*segments+x-1],
-						stiffness
-					)
-				);
-			}
+      if (x > 0){
+        composite.constraints.push(
+          new DistanceConstraint(
+            composite.particles[y*segments+x],
+            composite.particles[y*segments+x-1],
+            stiffness
+          )
+        );
+      }
 
-			if (y > 0){
-				composite.constraints.push(
-					new DistanceConstraint(
-						composite.particles[y*segments+x],
-						composite.particles[(y-1)*segments+x],
-						stiffness
-					)
-				);
-			}
-		}
-	}
+      if (y > 0){
+        composite.constraints.push(
+          new DistanceConstraint(
+            composite.particles[y*segments+x],
+            composite.particles[(y-1)*segments+x],
+            stiffness
+          )
+        );
+      }
+    }
+  }
 
-	for (x=0;x<segments;++x) {
-		if (x%pinMod == 0)
-		composite.pin(x);
-	}
+  for (x=0;x<segments;++x) {
+    if (x%pinMod === 0)
+    composite.pin(x);
+  }
 
-	this.composites.push(composite);
-	return composite;
-}
+  this.composites.push(composite);
+  return composite;
+};
 
 VerletJS.prototype.tire = function(origin, radius, segments, spokeStiffness, treadStiffness) {
-	var stride = (2*Math.PI)/segments;
-	var i;
+  var stride = (2*Math.PI)/segments;
+  var i;
 
-	var composite = new this.Composite();
+  var composite = new this.Composite();
 
-	// particles
-	for (i=0;i<segments;++i) {
-		var theta = i*stride;
-		composite.particles.push(new Particle(new Vec2(origin.x + Math.cos(theta)*radius, origin.y + Math.sin(theta)*radius)));
-	}
+  // particles
+  for (i=0;i<segments;++i) {
+    var theta = i*stride;
+    composite.particles.push(new Particle(new Vec2(origin.x + Math.cos(theta)*radius, origin.y + Math.sin(theta)*radius)));
+  }
 
-	var center = new Particle(origin);
-	composite.particles.push(center);
+  var center = new Particle(origin);
+  composite.particles.push(center);
 
-	// constraints
-	for (i=0;i<segments;++i) {
-		composite.constraints.push(
-			new DistanceConstraint(
-				composite.particles[i],
-				composite.particles[(i+1)%segments],
-				treadStiffness
-			)
-		);
-		composite.constraints.push(
-			new DistanceConstraint(
-				composite.particles[i],
-				center,
-				spokeStiffness
-			)
-		);
-		composite.constraints.push(
-			new DistanceConstraint(
-				composite.particles[i],
-				composite.particles[(i+5)%segments],
-				treadStiffness
-			)
-		);
-	}
+  // constraints
+  for (i=0;i<segments;++i) {
+    composite.constraints.push(
+      new DistanceConstraint(
+        composite.particles[i],
+        composite.particles[(i+1)%segments],
+        treadStiffness
+      )
+    );
+    composite.constraints.push(
+      new DistanceConstraint(
+        composite.particles[i],
+        center,
+        spokeStiffness
+      )
+    );
+    composite.constraints.push(
+      new DistanceConstraint(
+        composite.particles[i],
+        composite.particles[(i+5)%segments],
+        treadStiffness
+      )
+    );
+  }
 
-	this.composites.push(composite);
-	return composite;
-}
+  this.composites.push(composite);
+  return composite;
+};
 
-},{"./constraint":5,"./verlet":4}],4:[function(require,module,exports){
+},{"./constraint":4,"./verlet":3}],3:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -391,7 +297,7 @@ VerletJS.prototype.frame = function(step) {
       }
 
       // inertia
-      particles[i].pos.add(particles[i].vel.scale(this.friction));
+      particles[i].pos.add(particles[i].vel.scale(this.friction).scale(step));
 
 
     }
@@ -416,12 +322,13 @@ VerletJS.prototype.frame = function(step) {
       // calculate velocity
       particles[i].vel
       .set(particles[i].pos)
-      .sub(particles[i].lastPos);
+      .sub(particles[i].lastPos)
+      .div(step);
       // ground friction
       this.composites[c].aabb.digestPoint(particles[i].pos);
     }
   }
-  Collision(this.composites,step);
+  Collision(this.composites,step*1.5);
   this.logic();
 };
 
@@ -453,7 +360,7 @@ VerletJS.prototype.nearestEntity = function(target_vec2,radius) {
   return entity;
 };
 
-},{"./collision":10,"./structures/Composite":9,"./structures/Particle":8,"./structures/Vec2":7}],5:[function(require,module,exports){
+},{"./collision":11,"./structures/Composite":10,"./structures/Particle":9,"./structures/Vec2":6}],4:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -483,7 +390,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // PinConstraint -- constrains to static/fixed point
 // AngleConstraint -- constrains 3 particles to an angle
 
-var Vec2 = require("./structures/Vec2")
+var Vec2 = require("./structures/Vec2");
 
 exports.DistanceConstraint = require("./constraints/DistanceConstraint");
 exports.PinConstraint = require("./constraints/PinConstraint");
@@ -491,7 +398,7 @@ exports.AngleConstraint = require("./constraints/AngleConstraint");
 exports.MidpointAreaConstraint = require("./constraints/AreaConstraint");
 exports.ScaledAreaConstraint = require("./constraints/InflateAreaConstraint");
 
-},{"./constraints/AngleConstraint":13,"./constraints/AreaConstraint":14,"./constraints/DistanceConstraint":11,"./constraints/InflateAreaConstraint":15,"./constraints/PinConstraint":12,"./structures/Vec2":7}],11:[function(require,module,exports){
+},{"./constraints/AngleConstraint":14,"./constraints/AreaConstraint":15,"./constraints/DistanceConstraint":12,"./constraints/InflateAreaConstraint":16,"./constraints/PinConstraint":13,"./structures/Vec2":6}],12:[function(require,module,exports){
 function DistanceConstraint(a, b, stiffness, distance /*optional*/) {
   this.a = a;
   this.b = b;
@@ -505,19 +412,11 @@ DistanceConstraint.prototype.relax = function(stepCoef) {
   normal.scale(((this.distance*this.distance - m)/m)*this.stiffness*stepCoef);
   this.a.pos.add(normal);
   this.b.pos.sub(normal);
-}
-
-DistanceConstraint.prototype.draw = function(ctx) {
-  ctx.beginPath();
-  ctx.moveTo(this.a.pos.x, this.a.pos.y);
-  ctx.lineTo(this.b.pos.x, this.b.pos.y);
-  ctx.strokeStyle = "#d8dde2";
-  ctx.stroke();
-}
+};
 
 module.exports = DistanceConstraint;
 
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 function AngleConstraint(a, b, c, stiffness) {
   this.a = a;
   this.b = b;
@@ -535,29 +434,17 @@ AngleConstraint.prototype.relax = function(stepCoef) {
   else if (diff >= Math.PI)
     diff -= 2*Math.PI;
 
-    diff *= stepCoef*this.stiffness;
+  diff *= stepCoef*this.stiffness;
 
-    this.a.pos.rotate(this.b.pos, diff);
-    this.c.pos.rotate(this.b.pos, -diff);
-    this.b.pos.rotate(this.a.pos, diff);
-    this.b.pos.rotate(this.c.pos, -diff);
-  }
+  this.a.pos.rotate(this.b.pos, diff);
+  this.c.pos.rotate(this.b.pos, -diff);
+  this.b.pos.rotate(this.a.pos, diff);
+  this.b.pos.rotate(this.c.pos, -diff);
+};
 
-  AngleConstraint.prototype.draw = function(ctx) {
-    ctx.beginPath();
-    ctx.moveTo(this.a.pos.x, this.a.pos.y);
-    ctx.lineTo(this.b.pos.x, this.b.pos.y);
-    ctx.lineTo(this.c.pos.x, this.c.pos.y);
-    var tmp = ctx.lineWidth;
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "rgba(255,255,0,0.2)";
-    ctx.stroke();
-    ctx.lineWidth = tmp;
-  }
+module.exports = AngleConstraint;
 
-  module.exports = AngleConstraint;
-
-},{}],7:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 
 /*
 Copyright 2013 Sub Protocol and other contributors
@@ -648,7 +535,231 @@ Vec2.prototype.toArray = function() {
 	return [this.x,this.y];
 };
 
-},{"./no-arg":17,"./operations":18,"./to-value":16}],19:[function(require,module,exports){
+},{"./no-arg":18,"./operations":19,"./to-value":17}],7:[function(require,module,exports){
+
+window.requestAnimFrame = window.requestAnimationFrame ||
+  window.webkitRequestAnimationFrame ||
+  window.mozRequestAnimationFrame ||
+  window.oRequestAnimationFrame ||
+  window.msRequestAnimationFrame ||
+  function(callback) {
+    window.setTimeout(callback, 1000 / 60);
+  };
+var VerletJS = require("../../verlet.js");
+module.exports = VerletDraw;
+
+require('./constraints/AngleConstraint')(require('../../constraints/AngleConstraint'));
+require('./constraints/AreaConstraint')(require('../../constraints/AreaConstraint'));
+require('./constraints/DistanceConstraint')(require('../../constraints/DistanceConstraint'));
+require('./constraints/InflateAreaConstraint')(require('../../constraints/InflateAreaConstraint'));
+require('./constraints/PinConstraint')(require('../../constraints/PinConstraint'));
+require('./Particle');
+
+
+function VerletDraw(canvas, physics) {
+  if(!canvas) throw new Error('need a canvas');
+  this.canvas = canvas;
+  var width = parseInt(canvas.style.width);
+  var height = parseInt(canvas.style.height);
+  this.ctx = canvas.getContext("2d");
+  this.mouse = new Vec2(0,0);
+  this.mouseDown = false;
+  this.draggedEntity = null;
+  this.selectionRadius = 20;
+  this.highlightColor = "#4f545c";
+  this.physics = (!physics)?new VerletJS(width,height):physics;
+
+  var _this = this;
+
+  this.physics.logic = function(){
+    // handle dragging of entities
+    if (_this.draggedEntity)
+      _this.draggedEntity.pos.set(_this.mouse);
+  };
+
+
+  // prevent context menu
+  this.canvas.oncontextmenu = function(e) {
+    e.preventDefault();
+  };
+
+  this.canvas.onmousedown = function(e) {
+    _this.mouseDown = true;
+    var nearest = _this.physics.nearestEntity(_this.mouse,_this.selectionRadius);
+    if (nearest) {
+      _this.draggedEntity = nearest;
+      console.log(nearest.pos);
+    }
+  };
+
+  this.canvas.onmouseup = function(e) {
+    _this.mouseDown = false;
+    _this.draggedEntity = null;
+  };
+
+  this.canvas.onmousemove = function(e) {
+    var rect = _this.canvas.getBoundingClientRect();
+    _this.mouse.x = e.clientX - rect.left;
+    _this.mouse.y = e.clientY - rect.top;
+  };
+
+}
+
+
+VerletDraw.prototype.draw = function() {
+  var i, c;
+
+  this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  var composites = this.physics.composites;
+  for (c in composites) {
+    // draw constraints
+    if (composites[c].drawConstraints) {
+      composites[c].drawConstraints(this.ctx, composites[c]);
+    } else {
+      var constraints = composites[c].constraints;
+      for (i in constraints){
+        constraints[i].draw(this.ctx);
+      }
+    }
+
+    // draw particles
+    if (composites[c].drawParticles) {
+      composites[c].drawParticles(this.ctx, composites[c]);
+    } else {
+      var particles = composites[c].particles;
+      for (i in particles)
+        particles[i].draw(this.ctx);
+    }
+
+    if(composites[c].draw) composites[c].draw(this.ctx);
+
+  }
+
+  // highlight nearest / dragged entity
+  var nearest = this.draggedEntity || this.physics.nearestEntity(this.mouse,this.selectionRadius);
+  if (nearest) {
+    this.ctx.beginPath();
+    this.ctx.arc(nearest.pos.x, nearest.pos.y, 8, 0, 2*Math.PI);
+    this.ctx.strokeStyle = this.highlightColor;
+    this.ctx.stroke();
+  }
+};
+
+},{"../../constraints/AngleConstraint":14,"../../constraints/AreaConstraint":15,"../../constraints/DistanceConstraint":12,"../../constraints/InflateAreaConstraint":16,"../../constraints/PinConstraint":13,"../../verlet.js":3,"./Particle":25,"./constraints/AngleConstraint":20,"./constraints/AreaConstraint":21,"./constraints/DistanceConstraint":22,"./constraints/InflateAreaConstraint":23,"./constraints/PinConstraint":24}],8:[function(require,module,exports){
+
+window.requestAnimFrame = window.requestAnimationFrame ||
+  window.webkitRequestAnimationFrame ||
+  window.mozRequestAnimationFrame ||
+  window.oRequestAnimationFrame ||
+  window.msRequestAnimationFrame ||
+  function(callback) {
+    window.setTimeout(callback, 1000 / 60);
+  };
+var VerletJS = require("../../verlet.js");
+module.exports = VerletDraw;
+
+require('./constraints/AngleConstraint')(require('../../constraints/AngleConstraint'));
+require('./constraints/AreaConstraint')(require('../../constraints/AreaConstraint'));
+require('./constraints/DistanceConstraint')(require('../../constraints/DistanceConstraint'));
+require('./constraints/InflateAreaConstraint')(require('../../constraints/InflateAreaConstraint'));
+require('./constraints/PinConstraint')(require('../../constraints/PinConstraint'));
+require('./Particle');
+
+
+function VerletDraw(svg, physics) {
+  if(!svg) throw new Error('need an SVG Element');
+  this.svg = svg;
+  var width = svg.width.baseVal.value;
+  var height = svg.height.baseVal.value;
+  this.physics = (!physics)?new VerletJS(width,height):physics;
+
+
+  this.mouse = new Vec2(0,0);
+  this.mouseDown = false;
+  this.draggedEntity = null;
+  this.selectionRadius = 20;
+  this.highlightColor = "#4f545c";
+  this.selectorElement = document.createElement('circle');
+  this.selectorElement.setAttribute('r','8');
+  this.selectorElement.setAttribute('stroke',this.highlightColor);
+
+  var _this = this;
+
+  this.physics.logic = function(){
+    // handle dragging of entities
+    if (_this.draggedEntity)
+      _this.draggedEntity.pos.set(_this.mouse);
+  };
+
+
+  // prevent context menu
+  this.svg.oncontextmenu = function(e) {
+    e.preventDefault();
+  };
+
+  this.svg.onmousedown = function(e) {
+    _this.mouseDown = true;
+    var nearest = _this.physics.nearestEntity(_this.mouse,_this.selectionRadius);
+    if (nearest) {
+      _this.draggedEntity = nearest;
+      _this.svg.appendChild(_this.selectorElement);
+    }
+  };
+
+  this.svg.onmouseup = function(e) {
+    _this.mouseDown = false;
+    if(_this.draggedEntity){
+      _this.svg.removeChild(_this.selectorElement);
+    }
+    _this.draggedEntity = null;
+  };
+
+  this.svg.onmousemove = function(e) {
+    var rect = _this.svg.getBoundingClientRect();
+    _this.mouse.x = e.clientX - rect.left;
+    _this.mouse.y = e.clientY - rect.top;
+  };
+
+}
+
+
+VerletDraw.prototype.draw = function() {
+  var i, c;
+
+  var composites = this.physics.composites;
+  for (c in composites) {
+    // draw constraints
+    if (composites[c].drawConstraints) {
+      composites[c].drawConstraints(this.svg, composites[c]);
+    } else {
+      var constraints = composites[c].constraints;
+      for (i in constraints){
+        constraints[i].draw(this.svg);
+      }
+    }
+
+    // draw particles
+    if (composites[c].drawParticles) {
+      composites[c].drawParticles(this.svg, composites[c]);
+    } else {
+      var particles = composites[c].particles;
+      for (i in particles)
+        particles[i].draw(this.svg);
+    }
+
+    if(composites[c].draw) composites[c].draw(this.svg);
+
+  }
+
+  // highlight nearest / dragged entity
+  var nearest = this.draggedEntity || this.physics.nearestEntity(this.mouse,this.selectionRadius);
+  if (nearest) {
+    this.selectorElement.setAttribute('cx',nearest.pos.x);
+    this.selectorElement.setAttribute('cy',nearest.pos.y);
+  }
+};
+
+},{"../../constraints/AngleConstraint":14,"../../constraints/AreaConstraint":15,"../../constraints/DistanceConstraint":12,"../../constraints/InflateAreaConstraint":16,"../../constraints/PinConstraint":13,"../../verlet.js":3,"./Particle":31,"./constraints/AngleConstraint":26,"./constraints/AreaConstraint":27,"./constraints/DistanceConstraint":28,"./constraints/InflateAreaConstraint":29,"./constraints/PinConstraint":30}],32:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -703,7 +814,7 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}],20:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 (function(process){if (!process.EventEmitter) process.EventEmitter = function () {};
 
 var EventEmitter = exports.EventEmitter = process.EventEmitter;
@@ -900,7 +1011,7 @@ EventEmitter.listenerCount = function(emitter, type) {
 };
 
 })(require("__browserify_process"))
-},{"__browserify_process":19}],16:[function(require,module,exports){
+},{"__browserify_process":32}],17:[function(require,module,exports){
 
 var v = module.exports;
 
@@ -952,7 +1063,7 @@ v.angle2 = function(vLeft, vRight) {
 	return vLeft.clone().sub(this).angle(vRight.clone().sub(this));
 };
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 var v = module.exports;
 
 v.zero = function(){
@@ -999,7 +1110,7 @@ v.abs = function(){
   return this;
 };
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 var v = module.exports;
 
 v.add = function(v) {
@@ -1089,7 +1200,42 @@ v.set = function(v,y) {
 	return this;
 };
 
-},{}],8:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
+
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+  ctx.beginPath();
+  ctx.moveTo(this.a.pos.x, this.a.pos.y);
+  ctx.lineTo(this.b.pos.x, this.b.pos.y);
+  ctx.lineTo(this.c.pos.x, this.c.pos.y);
+  var tmp = ctx.lineWidth;
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "rgba(255,255,0,0.2)";
+  ctx.stroke();
+  ctx.lineWidth = tmp;
+};
+};
+},{}],22:[function(require,module,exports){
+
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+  ctx.beginPath();
+  ctx.moveTo(this.a.pos.x, this.a.pos.y);
+  ctx.lineTo(this.b.pos.x, this.b.pos.y);
+  ctx.strokeStyle = "#d8dde2";
+  ctx.stroke();
+};
+};
+},{}],24:[function(require,module,exports){
+module.exports = function(constraint){
+  constraint.prototype.draw = function(ctx) {
+  ctx.beginPath();
+  ctx.arc(this.pos.x, this.pos.y, 6, 0, 2*Math.PI);
+  ctx.fillStyle = "rgba(0,153,255,0.1)";
+  ctx.fill();
+};
+};
+},{}],9:[function(require,module,exports){
 var Vec2 = require("./Vec2");
 var EE = require("events").EventEmitter;
 
@@ -1098,17 +1244,23 @@ var EE = require("events").EventEmitter;
 // This is mostly for collision purposes currently
 function Particle(pos) {
   EE.call(this);
+  this.unique = Math.random().toString(32).substring(2);
   this.pos = (new Vec2()).set(pos);
   this.lastPos = (new Vec2()).set(pos);
   this.vel = new Vec2();
+  this.netForce = new Vec2();
 }
 
 Particle.prototype = Object.create(EE);
 Particle.prototype.constructor = Particle;
 
-Particle.prototype.draw = function(ctx) {
+Particle.prototype.draw = function(ctx,big) {
   ctx.beginPath();
-  ctx.arc(this.pos.x, this.pos.y, 2, 0, 2*Math.PI);
+  if(big){
+    ctx.arc(this.pos.x, this.pos.y, 20, 0, 2*Math.PI);
+  }else{
+    ctx.arc(this.pos.x, this.pos.y, 2, 0, 2*Math.PI);
+  }
   ctx.fillStyle = "#2dad8f";
   ctx.fill();
 };
@@ -1116,7 +1268,7 @@ Particle.prototype.draw = function(ctx) {
 
 module.exports = Particle;
 
-},{"./Vec2":7,"events":20}],9:[function(require,module,exports){
+},{"./Vec2":6,"events":33}],10:[function(require,module,exports){
 var AABB = require("./AABB");
 var EE = require("events").EventEmitter;
 
@@ -1147,7 +1299,7 @@ Composite.prototype.pin = function(index, pos) {
 
 module.exports = Composite;
 
-},{"./AABB":21,"events":20}],12:[function(require,module,exports){
+},{"./AABB":34,"events":33}],13:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2")
 
 function PinConstraint(a, pos) {
@@ -1157,18 +1309,11 @@ function PinConstraint(a, pos) {
 
 PinConstraint.prototype.relax = function(stepCoef) {
   this.a.pos.set(this.pos);
-}
-
-PinConstraint.prototype.draw = function(ctx) {
-  ctx.beginPath();
-  ctx.arc(this.pos.x, this.pos.y, 6, 0, 2*Math.PI);
-  ctx.fillStyle = "rgba(0,153,255,0.1)";
-  ctx.fill();
-}
+};
 
 module.exports = PinConstraint;
 
-},{"../structures/Vec2":7}],14:[function(require,module,exports){
+},{"../structures/Vec2":6}],15:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
 var Triangle = require("../structures/Triangle");
 var Polygon = require("../structures/Polygon");
@@ -1277,76 +1422,6 @@ AreaConstraint.prototype.relax = function(stepCoef) {
     _this.storedaabb.digestPoint(curr);
   });
 };
-AreaConstraint.prototype.draw = function(ctx) {
-  var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
-  var inv = Math.floor(Math.min(255,255*this.storedarea/this.area));
-  ctx.beginPath();
-  ctx.moveTo(this.points[0].x, this.points[0].y);
-  var _this = this;
-  var problem = false;
-  var intersects = [];
-  var eq = false;
-  this.points.forThree(function(prev,curr,next,i){
-    /*
-    if(curr.equals(next)){
-      eq = prev
-      return;
-    }
-    if(eq){
-      prev = eq;
-      eq = false;
-    }
-    */
-    var tri = new Triangle(prev,curr,next);
-    if(tri.isConcave()){
-      if(tri.hasPoint(_this.storedmid)){
-        problem = true;
-      }
-    }
-    var intersections = _this.points.getIntersects(prev,curr,i);
-    if(intersections.length > 0){
-      //        alert("you may get a negative area here");
-      intersects = intersects.concat(intersections);
-    }
-    ctx.lineTo(curr.x,curr.y);
-  });
-
-  var g = (diff < inv)?diff:inv;
-  ctx.closePath();
-  ctx.fillStyle="rgba("+diff+","+g+","+inv+",0.6)";
-  ctx.fill();
-
-
-  for(var i=intersects.length;i--;){
-    ctx.beginPath();
-    ctx.arc(
-      intersects[i].x,
-      intersects[i].y,
-      8, 0, 2 * Math.PI, false
-    );
-    ctx.fillStyle = "#FF8300";
-    ctx.fill();
-  }
-
-  var tri = this.points.getDelaney();
-  for(i = tri.length; i; ) {
-    ctx.beginPath();
-    --i; ctx.moveTo(this.points[tri[i]].x, this.points[tri[i]].y);
-    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
-    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
-    ctx.closePath();
-    ctx.stroke();
-  }
-
-  ctx.beginPath();
-  ctx.arc(
-    this.storedmid.x,
-    this.storedmid.y,
-    2, 0, 2 * Math.PI, false
-  );
-  ctx.fillStyle = problem?"#FF0000":"#00FF00";
-  ctx.fill();
-};
 
 module.exports = AreaConstraint;
 
@@ -1398,12 +1473,25 @@ There are a few issues here
 
 */
 
-},{"../structures/AABB":21,"../structures/Polygon":23,"../structures/Triangle":22,"../structures/Vec2":7}],15:[function(require,module,exports){
+},{"../structures/AABB":34,"../structures/Polygon":36,"../structures/Triangle":35,"../structures/Vec2":6}],16:[function(require,module,exports){
 var Vec2 = require("../structures/Vec2");
 var Line = require("../structures/Line");
 var Triangle = require("../structures/Triangle");
 var Polygon = require("../structures/Polygon");
-var AABB = require("../structures/AABB")
+var AABB = require("../structures/AABB");
+
+/*
+  Findout when we are intersecting ourself
+  Findout when we go concave while intersecting ourself
+  Findout when the intersection ends
+
+  The Intersecting lines will be scaled relative to
+  -How much of the line is on the positive side - Attempt to Expand
+  -How much of the line is on the negative side - Attempt to shrink
+
+  All lines that are in the negative area will attempt to shrink
+
+*/
 
 
 function AreaConstraint(points, stiffness) {
@@ -1421,7 +1509,7 @@ function AreaConstraint(points, stiffness) {
   this.storedarea = 0;
   this.storedmid = 0;
   this.storedaabb = new AABB();
-  if(!this.area || this.area == 0){
+  if(!this.area || this.area === 0){
     throw new Error("cannot calculate a nonexistant area");
   }
   this.stiffness = stiffness;
@@ -1434,9 +1522,9 @@ AreaConstraint.prototype.relax = function(stepCoef) {
   var l = this.points.length;
   this.points.forThree(function(prev,curr,next){
     area += curr.cross(next);
-    mid.add(curr.clone().scale(1/l))
+    mid.add(curr.clone().scale(1/l));
     //perimeter += curr.dist(next);
-  })
+  });
   if(area <= 0){
     alert("negative area");
     throw new Error("negative area");
@@ -1445,13 +1533,13 @@ AreaConstraint.prototype.relax = function(stepCoef) {
   //I have the two areas
   var diff = (
     this.area* //The desired area
-    (this.stiffness*stepCoef)
-    +(1-this.stiffness*stepCoef)
-    *area
+    (this.stiffness*stepCoef)+
+    (1-this.stiffness*stepCoef)*
+    area
   )/area;
 
   var _this = this;
-  var eq = false
+  var eq = false;
   var lastcurr = this.points[this.points.length-1];
   var lastnext = this.points[0].clone();
   var _prev = this.points[this.points.length-1];
@@ -1459,111 +1547,15 @@ AreaConstraint.prototype.relax = function(stepCoef) {
   this.points.forThree(function(prev,curr,next,i){
     var nl = curr.clone();
     curr.sub(_prev).scale(diff).add(prev);
-    nm.add(curr.clone().scale(1/l))
+    nm.add(curr.clone().scale(1/l));
     _prev = nl;
-  })
+  });
   while(l--){
     this.points[l].sub(nm).add(mid);
   }
   this.storedarea = area*diff;
   this.storedmid = mid;
-}
-AreaConstraint.prototype.draw = function(ctx) {
-  var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
-  var inv = Math.floor(Math.min(255,255*this.storedarea/this.area));
-  var _this = this;
-  var problem = false;
-  var intersects = [];
-  var eq = false;
-  var effectivepoints = [];
-  //fill
-  var l = this.points.length-1;
-  ctx.beginPath();
-  ctx.moveTo(this.points[l].x, this.points[l].y);
-  while(l--){
-    ctx.lineTo(this.points[l].x,this.points[l].y);
-  }
-  var g = (diff < inv)?diff:inv;
-  ctx.closePath();
-  ctx.fillStyle="rgba("+diff+","+g+","+inv+",0.6)";
-  ctx.fill();
-  //delaney
-  /*
-  var tri = this.points.getDelaney();
-  for(i = tri.length; i; ) {
-    ctx.beginPath();
-    --i; ctx.moveTo(this.points[tri[i]].x, this.points[tri[i]].y);
-    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
-    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
-    ctx.closePath();
-    ctx.stroke();
-  }
-  */
-
-
-  //draw perimiter
-  ctx.lineWidth = 4;
-  this.points.forThree(function(prev,curr,next,i){
-    if(curr.equals(next)){
-      eq = eq||prev
-      return;
-    }
-    if(eq){
-      prev = eq;
-      eq = false;
-    }
-    effectivepoints.push(curr);
-    var tri = new Triangle(prev,curr,next);
-
-    var mp = tri.getConcaveBisector();
-
-    var badarea = false;
-    if( tri.CA.pointIsLeftOrTop(mp.B) == tri.CA.pointIsLeftOrTop(tri.B)){
-      ctx.strokeStyle = "#FFFF00";
-      if(tri.hasPoint(_this.storedmid)){
-        problem = true;
-      }
-    }else{
-      ctx.strokeStyle = "#FF00FF";
-      if(tri.partialArea < 0){
-        badarea = true;
-      }
-    }
-    var intersections = _this.points.intersectsLine(new Line(prev,curr),i);
-    if(intersections.length > 0){
-      //        alert("you may get a negative area here");
-      intersects = intersects.concat(intersections);
-    }
-    ctx.beginPath();
-    ctx.moveTo((prev.x+curr.x)/2, (prev.y+curr.y)/2);
-    ctx.lineTo(curr.x,curr.y);
-    ctx.lineTo((next.x+curr.x)/2, (next.y+curr.y)/2);
-    ctx.stroke();
-  })
-  ctx.lineWidth = 1;
-
-  //intersects
-  for(var i=intersects.length;i--;){
-    ctx.beginPath();
-    ctx.arc(
-      intersects[i].x,
-      intersects[i].y,
-      8, 0, 2 * Math.PI, false
-    );
-    ctx.fillStyle = "#FF8300";
-    ctx.fill();
-  };
-
-  //midpoint
-  ctx.beginPath();
-  ctx.arc(
-    this.storedmid.x,
-    this.storedmid.y,
-    2, 0, 2 * Math.PI, false
-  );
-  ctx.fillStyle = problem?"#FF0000":"#00FF00";
-  ctx.fill();
-}
+};
 
 module.exports = AreaConstraint;
 
@@ -1602,7 +1594,33 @@ a/Sin(A) = b/Sin(B) = c/Sin(C)
 A = Sin(A)* Sin(C) * b^2 / (Sin(B)*Sin(90))
 */
 
-},{"../structures/AABB":21,"../structures/Line":24,"../structures/Polygon":23,"../structures/Triangle":22,"../structures/Vec2":7}],25:[function(require,module,exports){
+},{"../structures/AABB":34,"../structures/Line":37,"../structures/Polygon":36,"../structures/Triangle":35,"../structures/Vec2":6}],25:[function(require,module,exports){
+
+require('../../structures/Particle').prototype.draw = function(ctx, big){
+  ctx.beginPath();
+  if(big){
+    ctx.arc(this.pos.x, this.pos.y, 20, 0, 2*Math.PI);
+  }else{
+    ctx.arc(this.pos.x, this.pos.y, 2, 0, 2*Math.PI);
+  }
+  ctx.fillStyle = "#2dad8f";
+  ctx.fill();
+};
+},{"../../structures/Particle":9}],31:[function(require,module,exports){
+var generics = require('./generics');
+require('../../structures/Particle').prototype.draw = function(ctx, big){
+  if(!this.svgPoint){
+    this.svgPoint = generics.circle(2,this.pos,"#2dad8f");
+    ctx.appendChild(this.svgPoint);
+  }
+  if(big){
+    this.svgPoint.r = '20';
+  }else{
+    this.svgPoint.r = '2';
+  }
+  this.svgPoint.svgUpdate(this.pos);
+};
+},{"../../structures/Particle":9,"./generics":38}],39:[function(require,module,exports){
 /*
 
   The High level of this explanation is
@@ -1911,6 +1929,485 @@ time*(
 */
 
 },{}],26:[function(require,module,exports){
+var generics = require('../generics');
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+  if(!this.svgLines){
+    var color = 'rgba(255,255,0,0.2)';
+    this.svgLines = {};
+    this.svgLines.ab = generics.line(this.a.pos,this.b.pos,5,color);
+    ctx.appendChild(this.svgLines.ab);
+    this.svgLines.bc = generics.line(this.b.pos,this.c.pos,5,color);
+    ctx.appendChild(this.svgLines.bc);
+  }
+  this.svgLines.ab.svgUpdate(this.a.pos,this.b.pos);
+  this.svgLines.ac.svgUpdate(this.b.pos,this.c.pos);
+};
+};
+
+},{"../generics":38}],28:[function(require,module,exports){
+var generics = require('../generics');
+
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+  if(!this.svgLine){
+    this.svgLine = generics.line(this.a.pos,this.b.pos,1,"#d8dde2");
+    ctx.appendChild(this.svgLine);
+  }
+
+  this.svgLine.svgUpdate(this.a.pos,this.b.pos);
+};
+
+};
+},{"../generics":38}],30:[function(require,module,exports){
+var generics = require('../generics');
+
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+  if(!this.svgPoint){
+    this.svgPoint = generics.circle(6,this.pos,"rgba(0,153,255,0.1)");
+    ctx.appendChild(this.svgPoint);
+  }
+  this.svgPoint.svgUpdate(this.pos);
+};
+};
+},{"../generics":38}],21:[function(require,module,exports){
+var Triangle = require("../../../structures/Triangle");
+var Line = require("../../../structures/Line");
+
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+  var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
+  var inv = Math.floor(Math.min(255,255*this.storedarea/this.area));
+  ctx.beginPath();
+  ctx.moveTo(this.points[0].x, this.points[0].y);
+  var _this = this;
+  var problem = false;
+  var intersects = [];
+  var eq = false;
+  this.points.forThree(function(prev,curr,next,i){
+    /*
+    if(curr.equals(next)){
+      eq = prev
+      return;
+    }
+    if(eq){
+      prev = eq;
+      eq = false;
+    }
+    */
+    var tri = new Triangle(prev,curr,next);
+    if(tri.isConcave()){
+      if(tri.hasPoint(_this.storedmid)){
+        problem = true;
+      }
+    }
+    var intersections = _this.points.getIntersects(prev,curr,i);
+    if(intersections.length > 0){
+      //        alert("you may get a negative area here");
+      intersects = intersects.concat(intersections);
+    }
+    ctx.lineTo(curr.x,curr.y);
+  });
+
+  var g = (diff < inv)?diff:inv;
+  ctx.closePath();
+  ctx.fillStyle="rgba("+diff+","+g+","+inv+",0.6)";
+  ctx.fill();
+
+
+  for(var i=intersects.length;i--;){
+    ctx.beginPath();
+    ctx.arc(
+      intersects[i].x,
+      intersects[i].y,
+      8, 0, 2 * Math.PI, false
+    );
+    ctx.fillStyle = "#FF8300";
+    ctx.fill();
+  }
+
+  var tri = this.points.getDelaney();
+  for(i = tri.length; i; ) {
+    ctx.beginPath();
+    --i; ctx.moveTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.arc(
+    this.storedmid.x,
+    this.storedmid.y,
+    2, 0, 2 * Math.PI, false
+  );
+  ctx.fillStyle = problem?"#FF0000":"#00FF00";
+  ctx.fill();
+};
+};
+},{"../../../structures/Line":37,"../../../structures/Triangle":35}],23:[function(require,module,exports){
+var Triangle = require("../../../structures/Triangle");
+var Line = require("../../../structures/Line");
+
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+  var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
+  var inv = Math.floor(Math.min(255,255*this.storedarea/this.area));
+  var _this = this;
+  var problem = false;
+  var intersects = [];
+  var eq = false;
+  var effectivepoints = [];
+  //fill
+  var l = this.points.length-1;
+  ctx.beginPath();
+  ctx.moveTo(this.points[l].x, this.points[l].y);
+  while(l--){
+    ctx.lineTo(this.points[l].x,this.points[l].y);
+  }
+  var g = (diff < inv)?diff:inv;
+  ctx.closePath();
+  ctx.fillStyle="rgba("+diff+","+g+","+inv+",0.6)";
+  ctx.fill();
+  //delaney
+  /*
+  var tri = this.points.getDelaney();
+  for(i = tri.length; i; ) {
+    ctx.beginPath();
+    --i; ctx.moveTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    --i; ctx.lineTo(this.points[tri[i]].x, this.points[tri[i]].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  */
+
+
+  //draw perimiter
+  ctx.lineWidth = 4;
+  this.points.forThree(function(prev,curr,next,i){
+    if(curr.equals(next)){
+      eq = eq||prev;
+      return;
+    }
+    if(eq){
+      prev = eq;
+      eq = false;
+    }
+    effectivepoints.push(curr);
+    var tri = new Triangle(prev,curr,next);
+
+    var mp = tri.getConcaveBisector();
+
+    var badarea = false;
+    if( tri.CA.pointIsLeftOrTop(mp.B) == tri.CA.pointIsLeftOrTop(tri.B)){
+      ctx.strokeStyle = "#FFFF00";
+      if(tri.hasPoint(_this.storedmid)){
+        problem = true;
+      }
+    }else{
+      ctx.strokeStyle = "#FF00FF";
+      if(tri.partialArea < 0){
+        badarea = true;
+      }
+    }
+    var intersections = _this.points.intersectsLine(new Line(prev,curr),i);
+    if(intersections.length > 0){
+      //        alert("you may get a negative area here");
+      intersects = intersects.concat(intersections);
+    }
+    ctx.beginPath();
+    ctx.moveTo((prev.x+curr.x)/2, (prev.y+curr.y)/2);
+    ctx.lineTo(curr.x,curr.y);
+    ctx.lineTo((next.x+curr.x)/2, (next.y+curr.y)/2);
+    ctx.stroke();
+  });
+  ctx.lineWidth = 1;
+
+  //intersects
+  for(var i=intersects.length;i--;){
+    ctx.beginPath();
+    ctx.arc(
+      intersects[i].x,
+      intersects[i].y,
+      8, 0, 2 * Math.PI, false
+    );
+    ctx.fillStyle = "#FF8300";
+    ctx.fill();
+  }
+
+  //midpoint
+  ctx.beginPath();
+  ctx.arc(
+    this.storedmid.x,
+    this.storedmid.y,
+    2, 0, 2 * Math.PI, false
+  );
+  ctx.fillStyle = problem?"#FF0000":"#00FF00";
+  ctx.fill();
+};
+};
+},{"../../../structures/Line":37,"../../../structures/Triangle":35}],27:[function(require,module,exports){
+var Triangle = require("../../../structures/Triangle");
+var Line = require("../../../structures/Line");
+var generics = require('../generics');
+
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+
+  if(!this.svgPolygon){
+     this.svgPolygon = generics.polygon();
+     this.svgMid = generics.circle(2);
+     this.svgMid.setAttribute('r','2');
+
+     ctx.appendChild(this.svgPolygon);
+     ctx.appendChild(this.svgMid);
+
+     this.svgTriangles = [];
+     this.svgIntersections = [];
+
+  }else{
+    this.svgTriangles.forEach(function(tri){
+      ctx.removeChild(tri);
+    });
+    this.svgIntersections.forEach(function(tri){
+      ctx.removeChild(tri);
+    });
+    this.svgTriangles = [];
+    this.svgIntersections = [];
+  }
+
+  var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
+  var inv = Math.floor(Math.min(255,255*this.storedarea/this.area));
+  ctx.beginPath();
+  this.svgPolygon.svgReset();
+  this.svgPolygon.svgPoint(this.points[0]);
+  var _this = this;
+  var problem = false;
+  var intersects = [];
+  var eq = false;
+  this.points.forThree(function(prev,curr,next,i){
+    /*
+    if(curr.equals(next)){
+      eq = prev
+      return;
+    }
+    if(eq){
+      prev = eq;
+      eq = false;
+    }
+    */
+    var tri = new Triangle(prev,curr,next);
+    if(tri.isConcave()){
+      if(tri.hasPoint(_this.storedmid)){
+        problem = true;
+      }
+    }
+    var intersections = _this.points.getIntersects(prev,curr,i);
+    if(intersections.length > 0){
+      //        alert("you may get a negative area here");
+      intersects = intersects.concat(intersections);
+    }
+    this.svgPolygon.svgPoint(curr);
+  });
+
+  var g = (diff < inv)?diff:inv;
+  this.svgPolygon.svgApply();
+  this.svgPolygon.style.fill = "rgba("+diff+","+g+","+inv+",0.6)";
+
+
+  for(var i=intersects.length;i--;){
+    var int = generics.circle(8,intersects[i],"#FF8300");
+    this.svgIntersections.push(int);
+    ctx.appendChild(int);
+  }
+
+  var tris = this.points.getDelaney();
+  for(i = tris.length; i; ) {
+    var tri = generics.polygon(1,'white');
+    --i; tri.svgPoint(this.points[tri[i]]);
+    --i; tri.svgPoint(this.points[tri[i]]);
+    --i; tri.svgPoint(this.points[tri[i]]);
+    tri.svgApply();
+    this.svgTriangles.push(tri);
+    ctx.appendChild(tri);
+  }
+
+  this.svgMid.svgUpdate(this.storedmid);
+  this.svgMid.style.fill = problem?"#FF0000":"#00FF00";
+};
+};
+},{"../../../structures/Line":37,"../../../structures/Triangle":35,"../generics":38}],29:[function(require,module,exports){
+var Triangle = require("../../../structures/Triangle");
+var Line = require("../../../structures/Line");
+var generics = require('../generics');
+
+module.exports = function(constraint){
+constraint.prototype.draw = function(ctx) {
+  if(!this.svgPolygon){
+     this.svgPolygon = generics.polygon();
+
+     this.svgMid = generics.circle(2);
+
+     ctx.appendChild(this.svgPolygon);
+     ctx.appendChild(this.svgMid);
+
+     this.svgTriangles = [];
+     this.svgIntersections = [];
+
+  }else{
+    this.svgTriangles.forEach(function(tri){
+      ctx.removeChild(tri);
+    });
+    this.svgIntersections.forEach(function(tri){
+      ctx.removeChild(tri);
+    });
+    this.svgTriangles = [];
+    this.svgIntersections = [];
+  }
+  var diff = Math.floor(Math.min(255,255*this.area/this.storedarea));
+  var inv = Math.floor(Math.min(255,255*this.storedarea/this.area));
+  var _this = this;
+  var problem = false;
+  var intersects = [];
+  var eq = false;
+  var effectivepoints = [];
+  //fill
+  var l = this.points.length-1;
+  var points = '';
+  this.svgPolygon.svgReset();
+  while(l--){
+    this.svgPolygon.svgPoint(this.points[l]);
+  }
+  var g = (diff < inv)?diff:inv;
+  this.svgPolygon.svgApply();
+  this.svgPolygon.style.fill = "rgba("+diff+","+g+","+inv+",0.6)";
+
+  //draw perimiter
+  ctx.lineWidth = 4;
+  this.points.forThree(function(prev,curr,next,i){
+    if(curr.equals(next)){
+      eq = eq||prev;
+      return;
+    }
+    if(eq){
+      prev = eq;
+      eq = false;
+    }
+    effectivepoints.push(curr);
+    var tri = new Triangle(prev,curr,next);
+
+    var mp = tri.getConcaveBisector();
+
+    var badarea = false;
+    var stroke;
+    if( tri.CA.pointIsLeftOrTop(mp.B) == tri.CA.pointIsLeftOrTop(tri.B)){
+      stroke = "#FFFF00";
+      if(tri.hasPoint(_this.storedmid)){
+        problem = true;
+      }
+    }else{
+      stroke = "#FF00FF";
+      if(tri.partialArea < 0){
+        badarea = true;
+      }
+    }
+    var intersections = _this.points.intersectsLine(new Line(prev,curr),i);
+    if(intersections.length > 0){
+      //        alert("you may get a negative area here");
+      intersects = intersects.concat(intersections);
+    }
+    var pl = generics.polyline(1,stroke);
+    pl.svgPoint(prev.clone().add(curr).div(2));
+    pl.svgPoint(curr);
+    pl.svgPoint(curr.clone().add(next).div(2));
+    pl.svgApply();
+    _this.svgTriangles.push(pl);
+    ctx.appendChild(pl);
+  });
+
+  for(var i=intersects.length;i--;){
+    var int = generics.circle(8,intersects[i],"#FF8300");
+    this.svgIntersections.push(int);
+    ctx.appendChild(int);
+  }
+
+  this.svgMid.svgUpdate(this.storedmid);
+  this.svgMid.style.fill = problem?"#FF0000":"#00FF00";
+};
+};
+},{"../../../structures/Line":37,"../../../structures/Triangle":35,"../generics":38}],38:[function(require,module,exports){
+module.exports.circle = function(r,center,fill){
+  var circle = document.createElement('circle');
+  circle.setAttribute('r',r);
+  if(center){
+    circle.setAttribute('cx',center.x);
+    circle.setAttribute('cy',center.y);
+  }
+  if(fill) circle.style.fill = fill;
+  circle.svgUpdate = function(center){
+    circle.setAttribute('cx',center.x);
+    circle.setAttribute('cy',center.y);
+  };
+  return circle;
+};
+
+module.exports.polygon = function(width, color, fill){
+  var poly = document.createElement('polygon');
+  var points = '';
+  if(width) poly.style['stroke-width'] = width;
+  if(color) poly.style.stroke = color;
+  if(fill) poly.style.fill = fill;
+  poly.svgReset = function(){
+    points = '';
+  };
+  poly.svgPoint = function(p){
+    points += Math.round(p.x)+','+Math.round(p.y)+' ';
+  };
+  poly.svgApply = function(){
+    poly.setAttribute('points',points);
+  };
+  return poly;
+};
+
+module.exports.polyline = function(width, color, fill){
+  var poly = document.createElement('polyline');
+  var points = '';
+  if(width) poly.style['stroke-width'] = width;
+  if(color)poly.style.stroke = color;
+  if(fill) poly.style.fill = fill;
+  poly.svgReset = function(){
+    points = '';
+  };
+  poly.svgPoint = function(p){
+    points += Math.round(p.x)+','+Math.round(p.y)+' ';
+  };
+  poly.svgApply = function(){
+    poly.setAttribute('points',points);
+  };
+  return poly;
+};
+
+
+module.exports.line = function(a,b, width, color){
+  var line = document.createElement('line');
+  if(width) line.style['stroke-width'] = width;
+  if(color) line.style.stroke = color;
+  line.setAttribute('x1', a.x);
+  line.setAttribute('y1', a.y);
+  line.setAttribute('x2', b.x);
+  line.setAttribute('y2', b.y);
+  line.svgUpdate = function(a,b){
+    line.setAttribute('x1', a.x);
+    line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x);
+    line.setAttribute('y2', b.y);
+  };
+  return line;
+};
+},{}],40:[function(require,module,exports){
 var Vel = require("./velocities.js");
 var Material = require("./material.js");
 
@@ -1987,7 +2484,7 @@ function getDirection(a,b,p,time){
 
 module.exports.distributeVelocities = distributeVelocities;
 
-},{"./material.js":28,"./velocities.js":27}],23:[function(require,module,exports){
+},{"./material.js":42,"./velocities.js":41}],36:[function(require,module,exports){
 function Polygon(oPoints){
   var l = oPoints.length;
   var i = l;
@@ -2037,7 +2534,7 @@ for(var i in intersects){
 
 module.exports = Polygon;
 
-},{"./cacheable":29,"./intersects":30}],27:[function(require,module,exports){
+},{"./cacheable":43,"./intersects":44}],41:[function(require,module,exports){
 
 function getVelocities(A1,B1,time){
   //Getting the midpoint between the points before velocities
@@ -2335,7 +2832,7 @@ module.exports.applyTransformAtPoint = function(A,B,P,transform){
 
 */
 
-},{}],28:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 
 
 function getParticleMass(p){
@@ -2379,45 +2876,100 @@ module.exports.getMassAtPoint = function(a,b,p){
   return m;
 };
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 var AABB = require("../structures/AABB");
 var Line = require("../structures/Line");
 var boxIntersect = require("box-intersect");
 var Time = require("./time");
 var Momentum = require("./momentum");
-var binaryOps = require('formula1-array-util');
 
 module.exports = checkForCollisions;
 module.exports.getSuspectPoints = getSuspectPoints;
-module.exports.insertCollisions = insertCollisions;
 module.exports.checkForImpact = checkForImpact;
 module.exports.getTimeOfImpact = getTimeOfImpact;
 module.exports.pointWithinSegment = pointWithinSegment;
 
-function checkForCollisions(composites,step){
-  var l = composites.length;
-  var aabbs = new Array(l);
-  while(l--){
-    aabbs[l] = composites[l].aabb.toArray();
-  }
-  var intersects = boxIntersect(aabbs);
-  if(!(l = intersects.length)) return;
-  var collisions = [];
-  while(l--){
-    var suspects = getSuspectPoints(
-      composites[intersects[l][0]],
-      composites[intersects[l][1]]
-    );
-    if(!suspects) continue;
-    insertCollisions(suspects.A.inside,suspects.B.lines,step,collisions);
-    insertCollisions(suspects.B.inside,suspects.A.lines,step,collisions);
-  }
+/*
 
-  resolveCollisions(collisions, step);
+Get All Intersections of AABBs
+For Each of the Intersections
+  -get suspect points and lines of the AABBs assocaited to the intersection
+    -For each of the suspect points and lines, find all collisions that are made
+
+Sort the collisions by time
+for Each collision
+  -Resolve the collision
+  -Re do Collision checking for
+    - That point
+    - The point's lines
+    - The line that collided with the point
+    - The line's points
+  -Check if the other collisions involved with the point and lines are still valid
+*/
+
+
+function checkForCollisions(composites,step){
+  var col;
+  while(step > 0){
+    console.log(step);
+    var earlytime = Number.POSITIVE_INFINITY;
+    var collisions;
+    var l = composites.length;
+    while(l--){
+      var ll = l;
+      var suspects = getSuspectPoints(composites[l],composites[l]);
+      if(suspects){
+        col = findEarliestCollision(suspects.A.inside,suspects.B.lines,step);
+        if(col.time < earlytime){
+          earlytime = col.time;
+          collisions = [col];
+        }else if(col.time === earlytime && earlytime < Number.POSITIVE_INFINITY){
+          collisions.push(col);
+        }
+      }
+      while(ll--){
+        if(!composites[l].aabb.intersectsAABB(composites[ll].aabb)) continue;
+        suspects = getSuspectPoints(composites[l],composites[ll]);
+        if(!suspects) continue;
+        col = findEarliestCollision(suspects.A.inside,suspects.B.lines,step);
+        if(col.time < earlytime){
+          earlytime = col.time;
+          collisions = [col];
+        }else if(col.time === earlytime && earlytime < Number.POSITIVE_INFINITY){
+          collisions.push(col);
+        }
+        col = findEarliestCollision(suspects.B.inside,suspects.A.lines,step);
+        if(col.time < earlytime){
+          earlytime = col.time;
+          collisions = [col];
+        }else if(col.time === earlytime && earlytime < Number.POSITIVE_INFINITY){
+          collisions.push(col);
+        }
+      }
+    }
+    if(earlytime === Number.POSITIVE_INFINITY) break;
+    console.log('distributing');
+    var points = [];
+    while(collisions.length){
+      col = collisions.pop();
+      if(points.indexOf(col.point) !== -1 && (
+        points.indexOf(col.line[0]) !== -1||
+        points.indexOf(col.line[1]) !== -1
+      )) continue;
+      Momentum.distributeVelocities(
+        col.point,
+        col.line[0],
+        col.line[1],
+        col.time
+      );
+      points.push(col.point, col.line[0], col.line[1]);
+    }
+    step = -earlytime;
+  }
 }
 
 function getSuspectPoints(compositeA, compositeB){
-  var manifold = compositeA.aabb.sub(compositeB.aabb);
+  var manifold = compositeA.aabb.clone().sub(compositeB.aabb);
 
   var suspectsA = manifold.getSuspects(compositeA.particles);
   var suspectsB = manifold.getSuspects(compositeB.particles);
@@ -2437,58 +2989,29 @@ function getSuspectPoints(compositeA, compositeB){
   return {A:suspectsA,B:suspectsB};
 }
 
-function insertCollisions(points,lines,timestep,collisions){
+function findEarliestCollision(points,lines,timestep){
   var l, ll;
   l = points.length;
-  // I'm not sure why I'm not looking for first impact and then resolving
-  // In fact I should be finding first impact, resolving that, then iterating again
-  // The reason for this is...
-  // 1) In the case where three objects are colliding
-  // 2) In case the result of a collision will cause a collision into another object
-  // 3) When accelleration becomes a factor resolved between time steps
   var col, p, a, b, tempTime;
+  var earliest = {time:Number.POSITIVE_INFINITY};
   while(l--){
     p = points[l];
     ll = lines.length;
-    col = {time:Number.POSITIVE_INFINITY,point:p};
     while(ll--){
       var line = lines[ll];
       a = line[0];
       b = line[1];
       tempTime = getTimeOfImpact(p,a,b,timestep);
       if(tempTime === false) continue;
-      if(tempTime === 0) continue;
-      if(tempTime > col.time) continue;
+      console.log("temptime",tempTime);
+      if(tempTime > earliest.time) continue;
       if(!pointWithinSegment(p,a,b,tempTime)) continue;
-      col.time = tempTime;
-      col.line=line;
+      earliest.time = tempTime;
+      earliest.line=line;
+      earliest.point = p;
     }
-    if(col.time === Number.POSITIVE_INFINITY) continue;
-    binaryOps.insert(collisions,col,compareTimes);
   }
-}
-
-function resolveCollisions(collisions, timestep){
-  //collisions is expected to be a sorted list
-  var tempTime;
-  while(collisions.length){
-    var col = collisions.pop();
-    if(col.line.modified){
-      var p = col.point;
-      var a = col.line[0];
-      var b = col.line[1];
-      tempTime = getTimeOfImpact(p,a,b,timestep);
-      if(tempTime === false) continue;
-      if(tempTime === 0) continue;
-      if(!pointWithinSegment(p,a,b,tempTime)) continue;
-      if(tempTime !== col.time && collisions.length && collisions[0].time < col.time){
-        binaryOps.insert(collisions,col,compareTimes);
-        continue;
-      }
-    }
-    Momentum.distributeVelocities(col.point,col.line[0],col.line[1],col.time);
-    col.line.modified = true;
-  }
+  return earliest;
 }
 
 function checkForImpact(p,line,timestep){
@@ -2520,7 +3043,7 @@ function pointWithinSegment(p,a,b,time){
   b = b.pos.clone().add(b.vel.clone().scale(time));
   p = p.pos.clone().add(p.vel.clone().scale(time));
 
-  return new AABB(a,b).containsPoint(p);
+  return new Line(a,b).segmentIntersectsPoint(p);
 }
 
 
@@ -2540,7 +3063,7 @@ function compareTimes(a,b){
   return b.time - a.time;
 }
 
-},{"../structures/AABB":21,"../structures/Line":24,"./momentum":26,"./time":25,"box-intersect":31,"formula1-array-util":32}],21:[function(require,module,exports){
+},{"../structures/AABB":34,"../structures/Line":37,"./momentum":40,"./time":39,"box-intersect":45}],34:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = require("../Line");
 
@@ -2559,6 +3082,10 @@ function AABB (points){
   }
 }
 
+AABB.prototype.clone = function(){
+  return new AABB(this.max,this.min);
+};
+
 AABB.prototype.toArray = function(){
   return this.min.toArray().concat(this.max.toArray());
 };
@@ -2574,10 +3101,10 @@ AABB.prototype.digestPoint = function(point){
 };
 
 AABB.prototype.intersectsAABB = function(oAABB){
-  if(this.min.x >= oAABB.max.x) return false;
-  if(this.min.y >= oAABB.max.y) return false;
-  if(oAABB.min.x >= this.max.x) return false;
-  if(oAABB.min.y >= this.max.y) return false;
+  if(this.min.x > oAABB.max.x) return false;
+  if(this.min.y > oAABB.max.y) return false;
+  if(oAABB.min.x > this.max.x) return false;
+  if(oAABB.min.y > this.max.y) return false;
   return true;
 };
 
@@ -2597,17 +3124,17 @@ AABB.prototype.containsPoint = function(point){
 
 AABB.prototype.intersectsLine = function(line){
   var tline = new Line(this.max, new Vec2(this.min.x,this.max.y));
-  var p = tline.intersectsLineSegment(line);
-  if(p && this.containsPoint(p)) return true;
+  if(tline.intersectsLineSegment(line)) return true;
+
   tline = new Line(this.max, new Vec2(this.max.x,this.min.y));
-  p = tline.intersectsLineSegment(line);
-  if(p && this.containsPoint(p)) return true;
+  if(tline.intersectsLineSegment(line)) return true;
+
   tline = new Line(this.min, new Vec2(this.max.x,this.min.y));
-  p = tline.intersectsLineSegment(line);
-  if(p && this.containsPoint(p)) return true;
+  if(tline.intersectsLineSegment(line)) return true;
+
   tline = new Line(this.min, new Vec2(this.min.x,this.max.y));
-  p = tline.intersectsLineSegment(line);
-  if(p && this.containsPoint(p)) return true;
+  if(tline.intersectsLineSegment(line)) return true;
+
   return false;
 };
 
@@ -2624,7 +3151,7 @@ AABB.prototype.getSuspects = require('./suspects.js');
 
 module.exports = AABB;
 
-},{"../Line":24,"../Vec2":7,"./suspects.js":33}],22:[function(require,module,exports){
+},{"../Line":37,"../Vec2":6,"./suspects.js":46}],35:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = require("../Line");
 
@@ -2666,7 +3193,7 @@ Triangle.prototype.getConcaveBisector = cacheable.getConcaveBisector;
 
 module.exports = Triangle;
 
-},{"../Line":24,"../Vec2":7,"./cacheable.js":36,"./intersects.js":34,"./questions.js":35}],34:[function(require,module,exports){
+},{"../Line":37,"../Vec2":6,"./cacheable.js":49,"./intersects.js":47,"./questions.js":48}],47:[function(require,module,exports){
 var Triangle = {};
 
 Triangle.hasPoint = function(point){
@@ -2694,7 +3221,7 @@ Triangle.hasPoint = function(point){
 
 module.exports = Triangle;
 
-},{}],35:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 
 var Triangle = {};
 
@@ -2765,7 +3292,7 @@ Triangle.equalAngles = function(tri) {
 
 module.exports = Triangle;
 
-},{}],36:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 var Triangle = {};
 
 Triangle.getConcaveBisector = function(){
@@ -2801,7 +3328,7 @@ Triangle.area = function(){
 
 module.exports = Triangle;
 
-},{}],24:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 
 
@@ -2821,6 +3348,8 @@ function Line(A,B){
   this.xint = (this.inv_slope !== false)?-this.inv_slope*A.y + A.x:false;
 
   this.mid = A.clone().mid(B);
+  this.max = A.clone().max(B);
+  this.min = A.clone().min(B);
   this.length2 = A.dist2(B);
   this.length = Math.sqrt(this.length2);
   this.cross = A.cross(B);
@@ -2868,7 +3397,7 @@ Line.prototype.getXValue = function(y){
 
 module.exports = Line;
 
-},{"../Vec2":7,"./intersects.js":37,"./questions.js":38}],38:[function(require,module,exports){
+},{"../Vec2":6,"./intersects.js":50,"./questions.js":51}],51:[function(require,module,exports){
 var Line = {};
 
 Line.equals = function(line){
@@ -2904,266 +3433,7 @@ Line.epsilonEqualMagnitude = function(line, epsilon) {
 
 module.exports =  Line;
 
-},{}],32:[function(require,module,exports){
-
-var binaryOps = {};
-
-binaryOps.upsert = function(array,item,compare,update){
-  var index = binaryOps.findAny(array,item,compare);
-  if(typeof index === "undefined") throw new Error("und");
-  if(typeof index === "undefined") throw new Error("und");
-  if(binaryOps.isFound(index)){
-    update(array[index],item);
-    return index;
-  }else{
-    return binaryOps.insertAtIndex(array,index,item);
-  }
-};
-
-binaryOps.insert = function(array,item,compare){
-  var index = binaryOps.findAny(array,item,compare);
-  return binaryOps.insertAtIndex(array,index,item);
-};
-
-binaryOps.findAny = function(array,item,compare,minIndex,maxIndex){
-  if(array.length === 0) return Number.POSITIVE_INFINITY;
-  if(array.length === 1) return binaryOps.easySingle(array[0],item,compare);
-  var currentCompare;
-  if(typeof minIndex === "undefined" || minIndex === 0){
-    currentCompare = binaryOps.easyMin(array, item, compare);
-    if(currentCompare !== false) return currentCompare;
-    minIndex = 1;
-  }
-  if(typeof maxIndex === "undefined" || maxIndex === array.length-1){
-    currentCompare = binaryOps.easyMax(array, item, compare);
-    if(currentCompare !== false) return currentCompare;
-    maxIndex = array.length - 2;
-  }
-  var currentIndex;
-  var currentElement;
-
-  while (minIndex <= maxIndex) {
-    currentIndex = (minIndex + maxIndex) / 2 | 0;
-    currentElement = array[currentIndex];
-    currentCompare = compare(currentElement, item);
-
-    if (currentCompare < 0) {
-        minIndex = currentIndex + 1;
-    }
-    else if (currentCompare > 0) {
-        maxIndex = currentIndex - 1;
-    }
-    else {
-      return currentIndex;
-    }
-  }
-  return -minIndex;
-};
-
-binaryOps.findRange = function(array,item,compare,minIndex,maxIndex){
-  if(array.length === 0) return Number.POSITIVE_INFINITY;
-  if(array.length === 1) return binaryOps.easySingle(array[0],item,compare);
-  var currentCompare;
-  if(typeof minIndex === "undefined" || minIndex === 0){
-    currentCompare = binaryOps.easyMin(array, item, compare);
-    if(currentCompare === Number.NEGATIVE_INFINITY) return currentCompare;
-    if(currentCompare !== false){
-      return [currentCompare,binaryOps.findLast(array,item,compare)];
-    }
-    minIndex = 1;
-  }
-  if(typeof maxIndex === "undefined" || maxIndex === array.length-1){
-    currentCompare = binaryOps.easyMax(array, item, compare);
-    if(currentCompare === Number.POSITIVE_INFINITY) return currentCompare;
-    if(currentCompare !== false){
-      return [binaryOps.findFirst(array,item,compare),currentCompare];
-    }
-    maxIndex = array.length - 2;
-  }
-  var currentIndex;
-  var currentElement;
-
-  var bounds = [];
-  var trueMin = minIndex;
-  var trueMax = maxIndex;
-
-  while (minIndex <= maxIndex) {
-    currentIndex = (minIndex + maxIndex) / 2 | 0;
-    currentElement = array[currentIndex];
-    currentCompare = compare(currentElement, item);
-
-    if (currentCompare < 0) {
-        minIndex = currentIndex + 1;
-    }
-    else if (currentCompare > 0) {
-        trueMax = currentIndex;
-        maxIndex = currentIndex - 1;
-    }
-    else if(compare(array[currentIndex-1], item) !== 0){
-      bounds[0] = currentIndex;
-      if(bounds[0] > trueMin) trueMin = bounds[0];
-      break;
-    }else{
-        if(compare(array[currentIndex+1], item) !== 0){
-          bounds[1] = currentIndex;
-        }else{
-          trueMin = currentIndex;
-        }
-        maxIndex = currentIndex;
-    }
-  }
-  if(typeof bounds[0] === "undefined" ) return -minIndex;
-  if(typeof bounds[1] !== "undefined") return bounds;
-  bounds[1] = binaryOps.findLast(array,item,compare,trueMin,trueMax);
-  return bounds;
-};
-
-binaryOps.findFirst = function(array,item,compare,minIndex,maxIndex){
-  if(array.length === 0) return Number.POSITIVE_INFINITY;
-  if(array.length === 1) return binaryOps.easySingle(array[0],item,compare);
-  var ret = binaryOps.easyOut(array,item,compare);
-  var currentCompare;
-  if(typeof minIndex === "undefined" || minIndex === 0){
-    currentCompare = binaryOps.easyMin(array, item, compare);
-    if(currentCompare !== false){
-      return currentCompare;
-    }
-    minIndex = 1;
-  }
-  if(typeof maxIndex === "undefined" || maxIndex === array.length-1){
-    currentCompare = binaryOps.easyMax(array, item, compare);
-    if(currentCompare === Number.POSITIVE_INFINITY) return currentCompare;
-    if(currentCompare !== false){
-      if(compare(array[currentCompare-1], item) < 0){
-        return currentCompare;
-      }
-    }
-    maxIndex = array.length - 2;
-  }
-  var currentIndex;
-  var currentElement;
-
-  if(minIndex === 0){
-    var c = compare(array[0], item);
-    if(c === 0){
-      return 0;
-    }else if(c < 0){
-      return Number.NEGATIVE_INFINITY;
-    }
-    minIndex++;
-  }
-
-  while (minIndex <= maxIndex) {
-    currentIndex = (minIndex + maxIndex) / 2 | 0;
-    currentElement = array[currentIndex];
-    currentCompare = compare(currentElement, item);
-
-    if (currentCompare < 0) {
-        minIndex = currentIndex + 1;
-    }
-    else if (currentCompare > 0) {
-        maxIndex = currentIndex - 1;
-    }
-    else if(compare(array[currentIndex-1], item) < 0){
-      return currentIndex;
-    }else{
-        maxIndex = currentIndex - 1;
-    }
-  }
-  return -minIndex;
-};
-
-binaryOps.findLast = function(array,item,compare,minIndex,maxIndex){
-  if(array.length === 0) return Number.POSITIVE_INFINITY;
-  if(array.length === 1) return binaryOps.easySingle(array[0],item,compare);
-  var currentCompare;
-  if(typeof maxIndex === "undefined" || maxIndex === array.length-1){
-    currentCompare = binaryOps.easyMax(array, item, compare);
-    if(currentCompare !== false){
-      return currentCompare;
-    }
-    maxIndex = array.length - 2;
-  }
-  if(typeof minIndex === "undefined" || minIndex === 0){
-    currentCompare = binaryOps.easyMin(array, item, compare);
-    if(currentCompare === Number.NEGATIVE_INFINITY) return currentCompare;
-    if(currentCompare !== false){
-      if(compare(array[currentCompare+1], item) < 0){
-        return currentCompare;
-      }
-    }
-    minIndex = 1;
-  }
-  var currentIndex;
-  var currentElement;
-
-  while (minIndex <= maxIndex) {
-    currentIndex = (minIndex + maxIndex) / 2 | 0;
-    currentElement = array[currentIndex];
-    currentCompare = compare(currentElement, item);
-
-    if (currentCompare < 0) {
-        minIndex = currentIndex + 1;
-    }
-    else if (currentCompare > 0) {
-        maxIndex = currentIndex - 1;
-    }
-    else if(compare(array[currentIndex+1], item) !== 0){
-      return currentIndex;
-    }else{
-        minIndex = currentIndex + 1;
-    }
-  }
-
-  return -minIndex;
-};
-
-binaryOps.easyMin = function(array,item,compare){
-  var i=0,c = compare(array[i],item);
-  if(c > 0) return Number.NEGATIVE_INFINITY;
-  if(c === 0) return i;
-  return false;
-};
-
-binaryOps.easyMax = function(array,item,compare){
-  var i=array.length-1,c=compare(array[i],item);
-  if(c < 0) return Number.POSITIVE_INFINITY;
-  if(c === 0) return i;
-  return false;
-};
-
-binaryOps.easySingle = function(aitem, item, compare){
-  var currentCompare = compare(aitem,item);
-  if(currentCompare > 0) return Number.NEGATIVE_INFINITY;
-  if(currentCompare < 0) return Number.POSITIVE_INFINITY;
-  return 0;
-};
-
-binaryOps.isFound = function(index){
-  if(index < 0) return false;
-  if(index === Number.POSITIVE_INFINITY) return false;
-  return true;
-};
-
-binaryOps.insertAtIndex = function(array,index,item){
-//  if(binaryOps.isFound(index)) throw new Error("cannot overwrite what already exists");
-  if(index === Number.POSITIVE_INFINITY){
-    array.push(item);
-    return array.length -1;
-  }
-  if(index === Number.NEGATIVE_INFINITY){
-    array.unshift(item);
-    return 0;
-  }
-  index *= -1;
-
-  array.splice(index, 0, item);
-  return index;
-};
-
-if(typeof module !== 'undefined' && module.exports) module.exports = binaryOps;
-
-},{}],33:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 var Line = require("../Line");
 
 module.exports = function(particles){
@@ -3176,45 +3446,26 @@ module.exports = function(particles){
   var temp, ari, ll;
   while(l--){
     var particle = particles[l];
-    xboo = (  particle.pos.x <= this.max.x &&
-              particle.pos.x >= this.min.x );
-    yboo = (  particle.pos.y <= this.max.y &&
-              particle.pos.y >= this.min.y );
-    if(!xboo && !yboo) continue;
-    if(xboo && yboo){
+    var nparticle = particles[(l-1+len)%len];
+    temp = new this.constructor(particle, nparticle);
+    if(!this.intersectsAABB(temp)) continue;
+    if(this.containsPoint(particle.pos)){
       inside.push(particle);
+      lines.push([particle,nparticle]);
+      continue;
     }
-    ari = [[(l+len-1)%len,l], [l, (l+1)%len]];
-    ll = 2;
-    while(ll--){
-      // TODO: Remove this searching alrgorithm
-      if(done.indexOf(ari[ll].join("|")) !== -1) continue;
-      done.push(ari[ll].join("|"));
-      var p1 = particles[ari[ll][0]].pos;
-      var p2 = particles[ari[ll][1]].pos;
-      // Here I'm checking if both points are inside
-      // If they are then we can add the line without a problem
-      if(this.containsPoint(p1) || this.containsPoint(p2)){
-        lines.push([particles[ari[ll][0]],particles[ari[ll][1]]]);
-        continue;
-      }
-      temp = new this.constructor(p1, p2);
-      // Here I'm checking if the AABB between p1,p2 intersects with the big AABB
-      // If not then we can ignore this
-      // Basically this will occur when
-      // Both Points have min.x<x<max.x
-      // And Both points max.y<y
-      if(!this.intersectsAABB(temp)) continue;
-      temp = new Line(p1,p2);
-      // Even if AABB intersects, the line may not
-      if(!this.intersectsLine(temp)) continue;
-      lines.push([particles[ari[ll][0]],particles[ari[ll][1]]]);
+    if(this.containsPoint(nparticle.pos)){
+      lines.push([particle,nparticle]);
+      continue;
     }
+    temp = new Line(particle.pos,nparticle.pos);
+    if(!this.intersectsLine(temp)) continue;
+    lines.push([particle,nparticle]);
   }
   return {inside:inside, lines:lines};
 };
 
-},{"../Line":24}],37:[function(require,module,exports){
+},{"../Line":37}],50:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 var Line = {};
 
@@ -3240,7 +3491,7 @@ Line.intersectsLine = function(lineB){
     intersect.y = lineA.true_slope*intersect.x + lineA.yint;
   }
   return intersect;
-}
+};
 
 Line.intersectsLineSegment = function(line){
   var intersect = this.intersectsLine(line);
@@ -3254,7 +3505,7 @@ Line.intersectsLineSegment = function(line){
   if(!(new Vec2().neginf().max(line.A).max(line.B).min(intersect).equals(intersect)))
     return false;
   return intersect;
-}
+};
 
 Line.pointIsLeftOrTop = function(p){
   //get slopes of the lines
@@ -3267,9 +3518,17 @@ Line.intersectsPoint = function(p){
   return p.y == p.x*this.slope.slope() + this.yint;
 };
 
+
+Line.segmentIntersectsPoint = function(p){
+  if(this.max.y < p.y) return false;
+  if(this.min.y > p.y) return false;
+  if(this.max.x < p.x) return false;
+  if(this.min.x > p.x) return false;
+  return this.intersectsPoint(p);
+};
 module.exports = Line;
 
-},{"../Vec2":7}],29:[function(require,module,exports){
+},{"../Vec2":6}],43:[function(require,module,exports){
 var Vec2 = require("../Vec2");
 
 
@@ -3305,7 +3564,7 @@ Polygon.getAABB = function(){
 
 module.exports = Polygon;
 
-},{"../Vec2":7}],30:[function(require,module,exports){
+},{"../Vec2":6}],44:[function(require,module,exports){
 var AABB = require("../AABB");
 var Line = require("../Line");
 var Polygon = {};
@@ -3347,7 +3606,7 @@ Polygon.intersectsLine = function(line,skip){
 };
 module.exports = Polygon;
 
-},{"../AABB":21,"../Line":24}],31:[function(require,module,exports){
+},{"../AABB":34,"../Line":37}],45:[function(require,module,exports){
 'use strict'
 
 module.exports = boxIntersectWrapper
@@ -3476,7 +3735,7 @@ function boxIntersectWrapper(arg0, arg1, arg2) {
       throw new Error('box-intersect: Invalid arguments')
   }
 }
-},{"./lib/intersect":40,"./lib/sweep":39,"typedarray-pool":41}],42:[function(require,module,exports){
+},{"./lib/intersect":53,"./lib/sweep":52,"typedarray-pool":54}],55:[function(require,module,exports){
 'use strict';
 
 //This code is extracted from ndarray-sort
@@ -3713,7 +3972,7 @@ function quickSort(left, right, data) {
     quickSort(less, great, data);
   }
 }
-},{}],43:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 'use strict'
 
 var DIMENSION   = 'd'
@@ -3858,7 +4117,7 @@ function bruteForcePlanner(full) {
 
 exports.partial = bruteForcePlanner(false)
 exports.full    = bruteForcePlanner(true)
-},{}],44:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
 'use strict'
 
 module.exports = genPartition
@@ -3879,7 +4138,7 @@ function genPartition(predicate, args) {
         .replace('$', predicate))
   return Function.apply(void 0, fargs)
 }
-},{}],39:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 (function(){'use strict'
 
 module.exports = {
@@ -4315,7 +4574,7 @@ red_loop:
   }
 }
 })()
-},{"./sort":42,"bit-twiddle":45,"typedarray-pool":41}],40:[function(require,module,exports){
+},{"./sort":55,"bit-twiddle":58,"typedarray-pool":54}],53:[function(require,module,exports){
 'use strict'
 
 module.exports = boxIntersectIter
@@ -4810,7 +5069,7 @@ function boxIntersectIter(
     }
   }
 }
-},{"./brute":43,"./median":46,"./partition":44,"./sweep":39,"bit-twiddle":45,"typedarray-pool":41}],46:[function(require,module,exports){
+},{"./brute":56,"./median":59,"./partition":57,"./sweep":52,"bit-twiddle":58,"typedarray-pool":54}],59:[function(require,module,exports){
 'use strict'
 
 module.exports = findMedian
@@ -4953,7 +5212,7 @@ function findMedian(d, axis, start, end, boxes, ids) {
     start, mid, boxes, ids,
     boxes[elemSize*mid+axis])
 }
-},{"./partition":44}],47:[function(require,module,exports){
+},{"./partition":57}],60:[function(require,module,exports){
 "use strict"
 
 function dupe_array(count, value, i) {
@@ -5003,7 +5262,7 @@ function dupe(count, value) {
 }
 
 module.exports = dupe
-},{}],45:[function(require,module,exports){
+},{}],58:[function(require,module,exports){
 /**
  * Bit twiddling hacks for JavaScript.
  *
@@ -5209,7 +5468,7 @@ exports.nextCombination = function(v) {
 }
 
 
-},{}],48:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 require=(function(e,t,n,r){function i(r){if(!n[r]){if(!t[r]){if(e)return e(r);throw new Error("Cannot find module '"+r+"'")}var s=n[r]={exports:{}};t[r][0](function(e){var n=t[r][1][e];return i(n?n:e)},s,s.exports)}return n[r].exports}for(var s=0;s<r.length;s++)i(r[s]);return i})(typeof require!=="undefined"&&require,{1:[function(require,module,exports){
 exports.readIEEE754 = function(buffer, offset, isBE, mLen, nBytes) {
   var e, m,
@@ -9074,7 +9333,7 @@ SlowBuffer.prototype.writeDoubleBE = Buffer.prototype.writeDoubleBE;
 },{}]},{},[])
 ;;module.exports=require("buffer-browserify")
 
-},{}],41:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 (function(Buffer,global){'use strict'
 
 var bits = require('bit-twiddle')
@@ -9290,5 +9549,5 @@ exports.clearCache = function clearCache() {
   }
 }
 })(require("__browserify_buffer").Buffer,window)
-},{"__browserify_buffer":48,"bit-twiddle":45,"dup":47}]},{},[1])
+},{"__browserify_buffer":61,"bit-twiddle":58,"dup":60}]},{},[1])
 ;

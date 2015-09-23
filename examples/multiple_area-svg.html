@@ -22,26 +22,16 @@
   <a href="https://github.com/formula1/verlet-js/blob/temp/examples/multiple_area.html">View on GitHub</a>
 </p>
 </div>
-<canvas id="scratch" style="width: 800px; height: 500px; background-color:#000"></canvas>
+<svg id="scratchSVG" width=800 height=500 ></svg>
 <script type="text/javascript">
 
 window.onload = function() {
-  var canvas = document.getElementById("scratch");
-
-  // canvas dimensions
-  var width = parseInt(canvas.style.width);
-  var height = parseInt(canvas.style.height);
-
-  // retina
-  var dpr = window.devicePixelRatio || 1;
-  canvas.width = width*dpr;
-  canvas.height = height*dpr;
-  canvas.getContext("2d").scale(dpr, dpr);
-
-  var VerletDraw = window.VerletDraw;
-
+  var svg = document.getElementById("scratchSVG");
+  var width = svg.width.baseVal.value;
+  var height = svg.height.baseVal.value;
+  console.log(width, height);
   // simulation
-  var draw = new VerletDraw(canvas);
+  var draw = new VerletSVGDraw(svg);
   var sim = draw.physics
   sim.friction = 1;
   var points = 7;
